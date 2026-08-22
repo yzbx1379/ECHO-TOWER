@@ -80,6 +80,7 @@
       this.usedSwap = 0; this.usedPulse = 0; this.usedFreeze = false;
       this.pendulumUsed = false; this.shadowUsed = false; this.firstStruck = new Set();
       this.stepsThisFloor = 0;
+      this.gateHintShown = false; // 每层重置栅栏门教学提示
       if (this.player) this.player.lastHitsThisFloor.clear();
     }
 
@@ -245,7 +246,16 @@
       const gate = this.gateAt(nx, ny);
       const solidPhase = t === T.PHASE && !this.phaseOpen(nx, ny);
       if (t === T.WALL || solidPhase || (t === T.GATE && !(gate && gate.open))) {
-        this.fx.sfx('bump'); return; // 不消耗回合
+        // 撞上关闭的栅栏门 → 一次性教学提示
+        if (t === T.GATE && gate) {
+          if (!this.gateHintShown) {
+            this.gateHintShown = true;
+            this.fx.toast('⚙ 这是充能栅栏门——找到同色「压力板」踩上去充能！');
+            this.fx.toast(`👣 踩满 ${gate.need} 次永久开启；你的回声也能帮你踩`);
+          }
+        }
+        this.fx.sfx('bump');
+        return; // 不消耗回合
       }
       const enemy = this.enemyAt(nx, ny);
       if (enemy) {

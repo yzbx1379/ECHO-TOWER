@@ -163,18 +163,40 @@
       }
       case T.GATE: {
         const g = game.gateAt(x, y);
+        const gc = ['#ffd27d', '#7fd8ff', '#8fe388', '#ff8ca8'][(g ? g.group : 0) % 4];
         if (g && g.open) { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(px + 8, py, 4, TS); ctx.fillRect(px + 22, py, 4, TS); }
         else {
-          ctx.fillStyle = '#6b5636'; ctx.fillRect(px + 4, py + 2, TS - 8, TS - 4);
-          ctx.strokeStyle = '#ffd27d'; ctx.strokeRect(px + 4, py + 2, TS - 8, TS - 4);
-          ctx.fillStyle = '#ffd27d';
-          ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText(String((g && g.charge) || 0) + '/' + String((g && g.need) || '?'), px + TS / 2, py + TS / 2 + 3);
+          // 竖栅栏 + 组色边框 + 充能进度（区别于宝箱的横箱造型）
+          ctx.fillStyle = '#2c2416'; ctx.fillRect(px + 3, py + 2, TS - 6, TS - 4);
+          for (let i = 0; i < 3; i++) { ctx.fillStyle = '#8a744a'; ctx.fillRect(px + 8 + i * 9, py + 3, 4, TS - 6); }
+          const pulse = g && g.charge > 0 ? 0.5 + 0.5 * Math.sin(time * 5) : 1;
+          ctx.save();
+          ctx.globalAlpha = pulse;
+          ctx.strokeStyle = gc; ctx.lineWidth = 2.5;
+          ctx.strokeRect(px + 3, py + 2, TS - 6, TS - 4);
+          ctx.fillStyle = gc;
+          ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('⚡' + String((g && g.charge) || 0) + '/' + String((g && g.need) || '?'), px + TS / 2, py - 2);
+          ctx.restore();
         }
         break;
       }
       case T.PLATE: {
-        circle(ctx, px + TS / 2, py + TS / 2, 10, '#3a3020', '#ffd27d', 2);
+        const pl = game.level.plates.find((q) => q.x === x && q.y === y);
+        const gc = ['#ffd27d', '#7fd8ff', '#8fe388', '#ff8ca8'][((pl ? pl.group : 0)) % 4];
+        const linked = game.level.gates.find((gg) => gg.group === (pl ? pl.group : 0));
+        const done = linked && linked.open;
+        // 呼吸光环提示可踩
+        const pr = 10 + Math.sin(time * 4 + x * 1.7) * (done ? 0 : 2.5);
+        ctx.save();
+        ctx.shadowColor = gc; ctx.shadowBlur = done ? 0 : 10;
+        circle(ctx, px + TS / 2, py + TS / 2, pr, '#3a3020', gc, 2.5);
+        circle(ctx, px + TS / 2, py + TS / 2, 3.5, done ? '#555' : gc);
+        if (!done && linked) {
+          ctx.fillStyle = gc; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('⚡' + (linked.need - Math.min(linked.charge || 0, linked.need)), px + TS / 2, py + TS - 1);
+        }
+        ctx.restore();
         break;
       }
       case T.PORTAL: {
@@ -509,6 +531,12 @@
     }
     mctx.fillStyle = '#7fd8ff';
     mctx.fillRect(L.exit.x * scale - 1, L.exit.y * scale - 1, scale + 2, scale + 2);
+    // 压力板（金点）与关闭的栅栏门（橙块）——方便寻找机关
+    for (const p of L.plates) { mctx.fillStyle = '#ffd27d'; mctx.fillRect(p.x * scale - 1, p.y * scale - 1, scale + 2, scale + 2); }
+    for (const g of L.gates) {
+      if (g.open) continue;
+      mctx.fillStyle = '#ff9a4d'; mctx.fillRect(g.x * scale, g.y * scale, scale, scale);
+    }
     for (const e of game.enemies) {
       if (e.dead) continue;
       mctx.fillStyle = e.boss ? '#ff4632' : 'rgba(255,107,107,.8)';
