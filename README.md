@@ -1,13 +1,20 @@
 # ⟲ 回声之塔 · ECHO TOWER
 
-> 原创回合制爬塔 Roguelite ｜ 纯 HTML5 Canvas，零依赖、零素材、双击即玩
+> [!IMPORTANT]
+> ### ▶ 打开即玩，无需安装
+> ## <https://yzbx1379.github.io/ECHO-TOWER/>
+> 推荐 Chrome / Edge 浏览器。也可以下载仓库后双击 `index.html` 离线游玩。
+
+![平台](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-%E6%B5%8F%E8%A7%88%E5%99%A8-8fe388) ![类型](https://img.shields.io/badge/%E7%B1%BB%E5%9E%8B-%E5%9B%9E%E5%90%88%E5%88%B6Roguelite-c084fc) ![关卡](https://img.shields.io/badge/%E5%85%B3%E5%8D%A1-100%E5%B1%82%C3%97%E2%89%A550%E6%AD%A5-ffd27d) ![依赖](https://img.shields.io/badge/%E4%BE%9D%E8%B5%96-%E9%9B%B6-59c9a5)
+
+> 原创回合制爬塔 Roguelite ｜ 纯 HTML5 Canvas，零依赖、零素材
 > **100 层程序生成地牢 × 每层最短通关路线 ≥50 步（数学保证）× "你的行动会被重演"核心机制**
 
 ---
 
 ## ▶ 怎么玩
 
-**双击 `index.html`**（Chrome / Edge 浏览器）即可开始。
+**打开 <https://yzbx1379.github.io/ECHO-TOWER/>** 在线游玩，或**双击本地 `index.html`**（Chrome / Edge 浏览器）离线开始。
 
 | 按键 | 功能 |
 |---|---|
