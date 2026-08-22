@@ -1,0 +1,17 @@
+# 依赖与本地工具链
+node_modules/
+.npm-cache/
+.pw-browsers/
+
+# 浏览器测试的临时产物
+.edge-profile*/
+.chrome-stderr.log
+*.zip
+
+# 网页快照（浏览器"另存为"产物，非源码）
+yzbx1379_ECHO-TOWER.html
+yzbx1379_ECHO-TOWER_files/
+
+# 系统文件
+Thumbs.db
+.DS_Store

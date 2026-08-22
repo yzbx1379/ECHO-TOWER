@@ -1,0 +1,16 @@
+{
+  "name": "echo-tower",
+  "version": "1.0.0",
+  "private": true,
+  "description": "回声之塔 ECHO TOWER —— 100层回声重演爬塔Roguelite（纯HTML5 Canvas，零依赖）",
+  "scripts": {
+    "test": "node test/gen.test.cjs && node test/sim.test.cjs && node test/dom-stub.cjs",
+    "test:gen": "node test/gen.test.cjs",
+    "test:sim": "node test/sim.test.cjs",
+    "test:ui": "node test/dom-stub.cjs",
+    "smoke:browser": "node test/smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}
