@@ -476,8 +476,9 @@
       const bw = 56;
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(cx - bw / 2, cy - 26, bw, 5);
       ctx.fillStyle = color; ctx.fillRect(cx - bw / 2, cy - 26, bw * Math.max(0, e.hp / e.maxHp), 5);
+      const bossNm = (window.EchoLang && window.EchoLang.isEN() && e.def && e.def.nameE) ? e.def.nameE : e.name;
       ctx.fillStyle = '#fff'; ctx.font = '10px "ZCOOL QingKe HuangYou",sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(e.name, cx, cy - 30);
+      ctx.fillText(bossNm, cx, cy - 30);
     } else if (e.hp < e.maxHp) {
       ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(cx - 10, cy - 14, 20, 3);
       ctx.fillStyle = '#ff6b6b'; ctx.fillRect(cx - 10, cy - 14, 20 * Math.max(0, e.hp / e.maxHp), 3);

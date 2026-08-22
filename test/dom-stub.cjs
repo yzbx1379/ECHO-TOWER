@@ -135,6 +135,7 @@ for (const id of ['game', 'minimap', 'ui-root', 'screen-root', 'stage']) {
 /* ---------------- 加载全部脚本 ---------------- */
 window.EchoData = require(path.join(__dirname, '..', 'js', 'data.js'));
 window.EchoGen = require(path.join(__dirname, '..', 'js', 'gen.js'));
+require(path.join(__dirname, '..', 'js', 'i18n.js'));
 require(path.join(__dirname, '..', 'js', 'audio.js'));
 require(path.join(__dirname, '..', 'js', 'core.js'));
 require(path.join(__dirname, '..', 'js', 'entities.js'));
@@ -235,6 +236,16 @@ shopItems[0].click(); // 买第一件
 /* 结算画面 */
 UI.gameOver({ floor: 7, steps: 300, kills: 12, shards: 15, dust: 20, time: 400 }, {}, () => {}, () => {});
 ok(hasText(documentStub.getElementById('modal-layer'), '塔将你留在了这里'), '失败结算文案渲染');
+
+/* 国际化：切到英文后 toast 应自动翻译 */
+window.EchoLang.set('en');
+UI.toast('⚙ 机关栅栏开启了！');
+{
+  const box = document.getElementById('toasts');
+  const last = box.children[box.children.length - 1];
+  ok(last && last.innerHTML.includes('gate swung open'), `EN toast 翻译: "${last && last.innerHTML}"`);
+}
+window.EchoLang.set('zh');
 
 console.log('—'.repeat(40));
 if (fail) { console.error(`✗ ${fail} 项失败`); process.exit(1); }

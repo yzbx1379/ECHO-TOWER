@@ -41,17 +41,22 @@
     state = 'title';
     game = null;
     UI.hideHUD();
+    const en = window.EchoLang.isEN();
     const root = document.getElementById('screen-root');
     root.classList.remove('hidden');
     root.innerHTML = `
       <div class="title-wrap">
         <div class="title-echo">⟲</div>
-        <h1 class="title-name">回声之塔</h1>
-        <p class="title-en">E C H O · T O W E R</p>
-        <p class="title-sub">100 层 · 你的每一步都会被重演</p>
-        <div class="title-stats dim small">最佳纪录：第 ${meta.best} 层 · 回尘 ✦${meta.dust} ${meta.endlessUnlocked ? '· 无尽已解锁 ∞' : ''}</div>
+        <h1 class="title-name">${en ? 'ECHO TOWER' : '回声之塔'}</h1>
+        <p class="title-en">${en ? '回 声 之 塔' : 'E C H O · T O W E R'}</p>
+        <p class="title-sub">${en ? '100 floors · every step you take will be replayed' : '100 层 · 你的每一步都会被重演'}</p>
+        <div class="title-stats dim small">${en
+          ? `Best: Floor ${meta.best} · Dust ✦${meta.dust}${meta.endlessUnlocked ? ' · Endless ∞ unlocked' : ''}`
+          : `最佳纪录：第 ${meta.best} 层 · 回尘 ✦${meta.dust}${meta.endlessUnlocked ? ' · 无尽已解锁 ∞' : ''}`}</div>
         <div class="btn-col title-btns" id="title-btns"></div>
-        <p class="dim tiny">方向键/WASD 移动 · 空格等待 · Esc 暂停</p>
+        <p class="dim tiny">${en
+          ? 'Arrows/WASD move · Space wait · J/F attack · Esc pause'
+          : '方向键/WASD 移动 · 空格等待 · J/F 攻击 · Esc 暂停'}</p>
       </div>`;
     const btns = root.querySelector('#title-btns');
     const mk = (label, fn, cls) => {
@@ -62,31 +67,35 @@
       btns.appendChild(b);
     };
     const hasRun = !!localStorage.getItem('echoTower.run');
-    if (hasRun) mk('▶ 继续攀爬', continueRun, 'primary');
-    mk(hasRun ? '新的一局' : '▶ 开始攀登', () => classSelect(), 'primary');
-    mk('◈ 塔碑（回尘护符）', charmScreen);
-    mk('? 攀塔指南', () => UI.help());
-    mk(meta.muted ? '🔇 声音：关' : '🔊 声音：开', () => {
+    if (hasRun) mk(en ? '▶ Continue Climb' : '▶ 继续攀爬', continueRun, 'primary');
+    mk(hasRun ? (en ? 'New Run' : '新的一局') : (en ? '▶ Start Climbing' : '▶ 开始攀登'), () => classSelect(), 'primary');
+    mk(en ? '◈ Monuments (Dust Charms)' : '◈ 塔碑（回尘护符）', charmScreen);
+    mk(en ? '? How to Play' : '? 攀塔指南', () => UI.help());
+    mk(meta.muted ? (en ? '🔊 Sound: On' : '🔇 声音：关') : (en ? '🔊 Sound: Off' : '🔊 声音：开'), () => {
       meta.muted = !meta.muted; A.setMuted(meta.muted); saveMeta(meta); titleScreen();
     }, 'ghost');
+    mk(en ? '🌐 中文' : '🌐 English', () => { window.EchoLang.set(window.EchoLang.isEN() ? 'zh' : 'en'); titleScreen(); }, 'ghost');
   }
 
   /* ---------------- 护符（元进度） ---------------- */
   function charmScreen() {
     state = 'charms';
+    const en = window.EchoLang.isEN();
     const root = document.getElementById('screen-root');
-    root.innerHTML = `<div class="title-wrap"><h1 class="title-name small">◈ 塔碑</h1>
-      <p class="title-sub">回尘 ✦${meta.dust} —— 用它铸刻永恒的护符</p><div class="charm-grid" id="charm-grid"></div>
-      <button class="btn ghost" id="charm-back">← 返回塔门</button></div>`;
+    root.innerHTML = `<div class="title-wrap"><h1 class="title-name small">◈ ${en ? 'Monuments' : '塔碑'}</h1>
+      <p class="title-sub">${en ? `Dust ✦${meta.dust} — engrave eternal charms with it` : `回尘 ✦${meta.dust} —— 用它铸刻永恒的护符`}</p><div class="charm-grid" id="charm-grid"></div>
+      <button class="btn ghost" id="charm-back">${en ? '← Back to Gate' : '← 返回塔门'}</button></div>`;
     const grid = root.querySelector('#charm-grid');
     for (const ch of D.CHARMS) {
       const owned = meta.charmsOwned.includes(ch.id);
+      const cn = en && ch.nameE ? ch.nameE : ch.name;
+      const cd = en && ch.descE ? ch.descE : ch.desc;
       const card = document.createElement('button');
       card.className = 'charm-card' + (owned ? ' owned' : meta.dust >= ch.cost ? '' : ' locked');
-      card.innerHTML = `<strong>${ch.name}</strong><span>${ch.desc}</span><b>${owned ? '✓ 已铸刻' : `✦${ch.cost}`}</b>`;
+      card.innerHTML = `<strong>${cn}</strong><span>${cd}</span><b>${owned ? (en ? '✓ Engraved' : '✓ 已铸刻') : `✦${ch.cost}`}</b>`;
       card.onclick = () => {
         if (owned) return;
-        if (meta.dust < ch.cost) { UI.toast('回尘不足'); return; }
+        if (meta.dust < ch.cost) { UI.toast(en ? 'Not enough dust' : '回尘不足'); return; }
         meta.dust -= ch.cost; meta.charmsOwned.push(ch.id); saveMeta(meta);
         A.sfx('levelup'); charmScreen();
       };
@@ -98,19 +107,20 @@
   /* ---------------- 职业选择 ---------------- */
   function classSelect() {
     state = 'classSelect';
+    const en = window.EchoLang.isEN();
     const equipped = D.CHARMS.filter((c) => meta.charmsOwned.includes(c.id));
     const root = document.getElementById('screen-root');
     root.innerHTML = `<div class="title-wrap">
-      <h1 class="title-name small">选择你的守塔人</h1>
-      ${equipped.length ? `<p class="tiny dim">护符生效：${equipped.map(c => c.name).join(' · ')}</p>` : ''}
+      <h1 class="title-name small">${en ? 'Choose Your Warden' : '选择你的守塔人'}</h1>
+      ${equipped.length ? `<p class="tiny dim">${en ? 'Charms active: ' : '护符生效：'}${equipped.map(c => en && c.nameE ? c.nameE : c.name).join(' · ')}</p>` : ''}
       <div class="class-row" id="class-row"></div>
-      <button class="btn ghost" id="cls-back">← 返回</button></div>`;
+      <button class="btn ghost" id="cls-back">${en ? '← Back' : '← 返回'}</button></div>`;
     const row = root.querySelector('#class-row');
     for (const cls of D.CLASSES) {
       const card = document.createElement('button');
       card.className = 'class-card';
       card.style.setProperty('--cc', cls.color);
-      card.innerHTML = `<h3 style="color:${cls.color}">${cls.name}</h3><p class="en">${cls.en}</p><p>${cls.desc}</p>`;
+      card.innerHTML = `<h3 style="color:${cls.color}">${en && cls.nameE ? cls.nameE : cls.name}</h3><p class="en">${cls.en}</p><p>${en && cls.descE ? cls.descE : cls.desc}</p>`;
       card.onclick = () => startRun(cls.id);
       row.appendChild(card);
     }
@@ -135,10 +145,15 @@
       onFloorStart: (level) => {
         // 注意：此回调在 EchoGame.create() 构造期间就会触发，此时模块级 game 尚未赋值，
         // 必须只用 level 参数自带的信息。
+        const en = window.EchoLang.isEN();
         const fl = level.floor;
         const b = D.bossOf(fl);
-        UI.banner(b ? `⚠ 第 ${fl} 层` : `第 ${fl} 层`,
-          b ? `${b.name} — ${b.title}` : `${level.biome.name} · ${level.biome.en}`);
+        if (b) {
+          const bn = en && b.nameE ? b.nameE : b.name;
+          UI.banner(`${en ? '⚠ Floor' : '⚠ 第'} ${fl} ${en ? '' : '层'}`, `${bn} — ${b.title}`);
+        } else {
+          UI.banner(en ? `Floor ${fl}` : `第 ${fl} 层`, `${level.biome.name} · ${level.biome.en}`);
+        }
       },
       onMusicBiome: (b) => A.startMusic(b),
       onMusicIntensity: (v) => A.setIntensity(v),
@@ -175,8 +190,9 @@
     document.getElementById('screen-root').classList.add('hidden');
     UI.updateHUD(game);
     A.startMusic(game.level.biome);
-    if (game.floor > 1) UI.banner(`第 ${game.floor} 层`, game.level.biome.name);
-    else UI.banner('第 1 层', '收集所有 ◆ 碎片，从出口离开');
+    const en = window.EchoLang.isEN();
+    if (game.floor > 1) UI.banner(en ? `Floor ${game.floor}` : `第 ${game.floor} 层`, en ? game.level.biome.en : game.level.biome.name);
+    else UI.banner(en ? 'Floor 1' : '第 1 层', en ? 'Collect all ◆ shards, then take the exit' : '收集所有 ◆ 碎片，从出口离开');
   }
 
   /* ---------------- 终局 ---------------- */

@@ -211,5 +211,120 @@
     { id:'shop_purify',name:'净尘香',   desc:'清除当前层的回声。', base:40 },
   ];
 
+  /* ---------------- 国际化：英文覆盖表（按 id 注入 nameE/descE/hintE） ---------------- */
+  const _EN = {
+    enemies: {
+      slime: ['Green Slime'], bat: ['Cave Bat'], sentry: ['Sentry Turret'], ghost: ['Wisp'],
+      wraithling: ['Lesser Wraith'], gargoyle: ['Gargoyle'], mimic: ['Mimic Chest'],
+      splitter: ['Splitter Slime'], slimeling: ['Slimelet'], archer: ['Bone Archer'],
+      voidmage: ['Void Mage'], bomber: ['Boom Bug'], mirrorthief: ['Mirror Thief'],
+      phasebeast: ['Phase Beast'],
+    },
+    bosses: {
+      gemini: { n: 'Gemini Warden', h: 'Twin mirrored guardians act in sync — each rises once at half HP. Break both twice!' },
+      clock: { n: 'Clock Tyrant', h: 'Radial barrages and tile-flipping arrows — walk against the push.' },
+      frost: { n: 'Frost Heart', h: 'Expanding frost rings and telegraphed icicles — stay off the marked tiles.' },
+      molten: { n: 'Molten Colossus', h: 'Triple charge leaves lava trails; slamming into walls stuns him.' },
+      hourglass: { n: 'Hourglass King', h: 'Every 8 turns he drags you 4 steps into the past — anticipate it!' },
+      eye: { n: 'Void Eye', h: 'Orbiting orbs in darkness — strike only while the eye is open.' },
+      choir: { n: 'Echo Choir', h: 'Three echoes replay your moves; the conductor is invulnerable until they fall.' },
+      janus: { n: 'Janus', h: 'Light and dark phases alternate — only the solid form can be hurt.' },
+      weaver: { n: 'The Weaver', h: 'A rotating laser web — keep moving with the safe arc.' },
+      firstecho: { n: 'The First Echo', h: 'It remembers every step of your run… three-phase finale.' },
+    },
+    relics: {
+      magnet: ['Magnet Charm', 'Gold flies to you within 3 tiles.'],
+      thorns: ['Thorn Mail', 'Attackers take 1 damage back.'],
+      slowaura: ['Chrono Watch', '20% chance an enemy skips its turn.'],
+      lifesteal: ['Vampire Fang', 'Heal 1 HP on kill.'],
+      lens: ['Echo Lens', 'Echo path preview extended to 12 steps.'],
+      lantern: ["Keeper's Lantern", '+2 vision radius on dark floors.'],
+      spring: ['Spring Boots', 'No sliding on ice.'],
+      shieldgen: ['Blast Shield', 'Halve explosion and laser damage.'],
+      greed: ['Greed Mask', '+50% gold, max HP -2.'],
+      scholar: ['Scholar Scroll', '+30% XP gained.'],
+      shadowstep: ['Shadow Knot', 'First hit each floor deals 0 damage.'],
+      coil: ['Storm Coil', 'Dash deals +2 damage and knocks back.'],
+      pendulum: ['Unfallen Pendulum', 'Survive a fatal hit at 1 HP, once per floor.'],
+      belt: ['Potion Belt', 'Heal 1 HP when you clear a floor.'],
+      compass: ['Golden Compass', 'Shards shimmer in your HUD direction.'],
+      cunning: ['Serpent Cunning', '10% chance to dodge contact damage.'],
+      bombbag: ['Bomb Pouch', '+2 bomb capacity, +1 blast radius.'],
+      echoheart: ['Echo Heart', 'Echoes never hurt you, and shatter drops double dust.'],
+      glasscannon: ['Glass Cannon', '+3 ATK, max HP -2.'],
+      guardian: ['Guardian Sigil', 'Adjacent enemies burn for 1 each turn.'],
+      midas: ['Midas Touch', '+3 gold per kill.'],
+      sprinter: ["Sprinter's Heel", 'Enemies stay passive during your first 10 steps each floor.'],
+      frostward: ['Frost Ward', 'Ice never slides you; thin ice never breaks underfoot.'],
+      phoenix: ['Phoenix Ember', 'Revive once per run at 3 HP.'],
+    },
+    talents: {
+      t_hp2: ['Stone Shell', '+2 max HP and heal 2.'],
+      t_hp4: ['Great Wall', '+4 max HP and heal 2. (rare)'],
+      t_atk1: ['Whetstone', '+1 ATK.'],
+      t_atk2: ['Steel Breaker', '+2 ATK. (rare)'],
+      t_dash: ['Dash Step', 'Unlock DASH: lunge in a line and slam enemies.'],
+      t_dashcd: ['Afterimage', 'Dash cooldown -1 (min 1).'],
+      t_bomb: ['Bomb Cache', 'Gain 2 bombs.'],
+      t_key: ['Key Blank', 'Gain 1 key.'],
+      t_heal: ['Chrono Dew', 'Heal 4 HP immediately.'],
+      t_freeze: ['Freeze Watch', 'Unlock TIME STOP: freeze all enemies for 3 turns (once per floor).'],
+      t_swap: ['Swap Art', 'Unlock SWAP: trade places with your echo (twice per floor).'],
+      t_pulse: ['Shock Pulse', 'Unlock PULSE: 3 damage to enemies within 2 tiles (twice per floor).'],
+      t_vision: ['Owl Eye', '+1 vision radius.'],
+      t_gold: ['Toll Money', 'Gain 50 gold.'],
+      t_crit: ['Weak Spot', '+15% crit chance (1.5x damage).'],
+      t_armor: ['Scale Armor', 'All incoming damage -1 (min 1).'],
+      t_xp: ['Epiphany', '+20% XP gained.'],
+      t_echoxp: ['Resonance', 'Echoes drop +6 extra dust when shattered.'],
+      t_shop: ['Haggling', 'Shop prices -20%.'],
+      t_bombdmg: ['Shaped Charges', 'Bomb damage +2.'],
+      t_laser: ['Polarized Lens', 'Laser damage to you is halved.'],
+      t_thorn2: ['Thorn Symbiosis', 'Thorns +1 (stacks with relic).'],
+      t_first: ['First Strike', 'Your first attack on each enemy per floor deals +2.'],
+      t_regen: ['Breathwork', 'Heal 1 HP every 12 turns.'],
+      t_golddmg: ['Bounty Hunter', '+2 gold per kill.'],
+      t_iceslip: ['Ice Claws', 'Stop sliding on ice whenever you wish.'],
+      t_plate: ['Mechanism Lore', 'Pressure plates charge twice as fast for you.'],
+      t_dust: ['Dust Affinity', '+30% dust this run.'],
+      't_maxhp%': ["Tower's Blessing", '+6 max HP. (rare)'],
+      t_atkhp: ['Blood Price', '+2 ATK, max HP -2.'],
+    },
+    classes: {
+      knight: ['HP +2, starts with the Thorn Mail relic. A steady frontline.'],
+      ranger: ['Unlock the ranged SPARK bolt (3-turn charge). Kiting is life.'],
+      shadow: ['First hit each floor is free; +25% dust. Dance on the blade.'],
+    },
+    charms: {
+      charm_atk1: ['Starting Edge', '+1 ATK at run start.'],
+      charm_hp2: ['Stone Skin', '+2 max HP at run start.'],
+      charm_lantern: ['Lamplighter', 'Start with the Keeper\u2019s Lantern relic.'],
+      charm_gold: ['Purse', 'Start with +60 gold.'],
+      charm_bomb: ['Blasting License', 'Start with 2 bombs.'],
+      charm_dash: ['Dash Initiate', 'Start with DASH unlocked.'],
+      charm_revive: ['Undying Candle', 'First death each run revives you at 3 HP.'],
+      charm_lens: ['Dust Magnet', '+20% dust gained.'],
+    },
+    shop: {
+      shop_heal: ['Chrono Dew', 'Restore 4 HP.'],
+      shop_maxhp: ['Life Crystal', '+2 max HP.'],
+      shop_atk: ['Whetstone', '+1 ATK.'],
+      shop_key: ['Brass Key', 'Opens locked chests.'],
+      shop_bomb: ['Bombs x2', 'Blast adjacent everything.'],
+      shop_relic: ['Mystery Relic', 'A random unowned relic.'],
+      shop_draft: ['Fate Reforge', 'Gain an extra draft right now.'],
+      shop_purify: ['Purifying Incense', 'Banish the current echo.'],
+    },
+  };
+  const byId = (arr) => Array.isArray(arr) ? Object.fromEntries(arr.map((x) => [x.id, x])) : arr;
+  const eById = byId(ENEMIES), rById = byId(RELICS), tlById = byId(TALENTS), chById = byId(CHARMS), spById = byId(SHOP_POOL);
+  for (const id in _EN.enemies) if (eById[id]) eById[id].nameE = _EN.enemies[id][0];
+  for (const id in _EN.bosses) { const b = BOSSES.find((x) => x.id === id); if (b) { b.nameE = _EN.bosses[id].n; b.hintE = _EN.bosses[id].h; } }
+  for (const id in _EN.relics) if (rById[id]) { rById[id].nameE = _EN.relics[id][0]; rById[id].descE = _EN.relics[id][1]; }
+  for (const id in _EN.talents) if (tlById[id]) { tlById[id].nameE = _EN.talents[id][0]; tlById[id].descE = _EN.talents[id][1]; }
+  for (const id in _EN.classes) { const c = CLASSES.find((x) => x.id === id); if (c) c.descE = _EN.classes[id][0]; }
+  for (const id in _EN.charms) if (chById[id]) { chById[id].nameE = _EN.charms[id][0]; chById[id].descE = _EN.charms[id][1]; }
+  for (const id in _EN.shop) if (spById[id]) { spById[id].nameE = _EN.shop[id][0]; spById[id].descE = _EN.shop[id][1]; }
+
   return { BAL, BIOMES, biomeOf, ENEMIES, BOSSES, bossOf, RELICS, TALENTS, CLASSES, CHARMS, SHOP_POOL };
 });
