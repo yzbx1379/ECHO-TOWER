@@ -65,13 +65,20 @@ b { color: #fff; }
   font-size: 9px; color: #cfe0ff; text-shadow: 0 1px 2px #000; letter-spacing: 2px;
 }
 #minimap {
-  position: absolute; left: 12px; top: 12px; z-index: 25;
+  position: absolute; z-index: 25;
+  left: calc(12px + env(safe-area-inset-left, 0px));
+  top: calc(12px + env(safe-area-inset-top, 0px));
   border: 1px solid var(--line); border-radius: 8px; opacity: .9;
   cursor: pointer;
 }
 #minimap:hover { border-color: rgba(143,227,136,.55); }
 /* 小地图在左上角时，左侧信息条向右让位 */
-#hud { padding-left: 208px; }
+#hud {
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: calc(12px + env(safe-area-inset-left, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  padding-left: 208px;
+}
 
 /* 移动端横屏优化 */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -86,24 +93,31 @@ b { color: #fff; }
   #banner h2 { font-size: 28px; letter-spacing: 6px; }
 }
 
-/* ---------------- 提示条 ---------------- */
+/* ---------------- 提示条（顶部居中，避开拇指区与摄像头） ---------------- */
 #toasts {
-  position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%);
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 70px);
+  transform: translateX(-50%);
   display: flex; flex-direction: column-reverse; align-items: center; gap: 6px; z-index: 40;
   pointer-events: none;
+  max-width: calc(100vw - 24px);
 }
 .toast {
-  background: rgba(10, 13, 22, 0.92); border: 1px solid var(--line);
-  padding: 6px 16px; border-radius: 20px; font-size: 14px; letter-spacing: 1px;
+  background: rgba(8, 11, 20, 0.95); border: 1px solid var(--line);
+  padding: 7px 18px; border-radius: 20px; font-size: 14px; letter-spacing: 1px;
   animation: toastIn .25s ease-out;
-  box-shadow: 0 4px 18px rgba(0,0,0,.55);
+  box-shadow: 0 4px 20px rgba(0,0,0,.65), 0 0 12px rgba(143,227,136,.12);
+  text-align: center;
 }
 .toast.out { opacity: 0; transform: translateY(-8px); transition: all .4s; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.95); } to { opacity: 1; } }
 
 /* ---------------- 楼层横幅 ---------------- */
 #banner {
-  position: absolute; top: 26%; left: 0; right: 0; text-align: center; z-index: 45;
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12%);
+  left: 0; right: 0; text-align: center; z-index: 45;
   pointer-events: none; animation: bannerIn .5s ease-out;
 }
 #banner h2 {
@@ -237,7 +251,10 @@ b { color: #fff; }
 
 /* 触屏控件：左侧十字方向键（标准手柄布局），右侧动作按钮 */
 #touch-pad {
-  position: absolute; left: 18px; bottom: 18px; z-index: 35;
+  position: absolute;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 35;
   display: grid;
   grid-template-columns: repeat(3, 58px);
   grid-template-rows: repeat(3, 58px);
@@ -256,7 +273,10 @@ b { color: #fff; }
 #touch-pad button:active { background: rgba(143,227,136,.3); }
 
 #action-pad {
-  position: absolute; right: 18px; bottom: 18px; z-index: 35;
+  position: absolute;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 35;
   display: flex; flex-direction: column; align-items: center; gap: 12px; opacity: .95;
 }
 #action-pad button {
@@ -276,8 +296,10 @@ b { color: #fff; }
   .title-name { font-size: 40px; letter-spacing: 12px; }
   .draft-row { flex-direction: column; }
   .shop-list { grid-template-columns: 1fr; }
-  #minimap { width: 130px; height: 90px; }
-  #hud { padding-left: 152px; }
-  #touch-pad { transform: scale(.9); transform-origin: bottom left; }
+  #minimap { width: 118px; height: 82px; }
+  #hud { padding-left: 140px; }
+  .hud-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+  #hud-steps .dim { display: none; } /* 窄屏隐藏最短步数注释，防拥挤 */
+  #touch-pad { transform: scale(.88); transform-origin: bottom left; }
   #action-pad { transform: scale(.9); transform-origin: bottom right; }
 }
