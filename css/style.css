@@ -292,6 +292,27 @@ b { color: #fff; }
 }
 #action-pad button:active { background: rgba(255,107,107,.28); transform: scale(.94); }
 
+/* ============================================================
+   触屏设备（手机/平板）：固定偏移避开摄像头（全屏时 env() 会失效，
+   所以用固定值），生命信息移到右上角，顶部中央完全留空。
+   ============================================================ */
+@media (pointer: coarse) {
+  #minimap { top: 34px; }
+  #hud { top: 32px; padding-left: 148px; }
+  #hud-center {
+    position: absolute; right: 6px; top: 0;
+    align-items: flex-end;
+  }
+  #hud-xpbar { width: 118px; }
+  #hud-right { margin-top: 52px; }
+  #toasts { top: 104px; }
+  #banner { top: 16%; }
+}
+@media (pointer: coarse) and (orientation: landscape) {
+  #hud { padding-left: 170px; }
+  #minimap { width: 150px; height: 104px; }
+}
+
 @media (max-width: 760px) {
   .title-name { font-size: 40px; letter-spacing: 12px; }
   .draft-row { flex-direction: column; }
