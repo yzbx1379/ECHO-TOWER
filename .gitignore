@@ -12,3 +12,6 @@ test/shot_*.png
 # 绯荤粺鏂囦欢
 Thumbs.db
 .DS_Store
+
+# 本地备份文件
+settings.yaml.backup

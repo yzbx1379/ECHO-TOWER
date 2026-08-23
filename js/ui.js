@@ -39,7 +39,6 @@
           <div id="hud-items" class="hud-chip">💣0 ⚿0</div>
         </div>
       </div>
-      <button id="ingame-menu" class="hidden" title="菜单 Menu">☰</button>
       <canvas id="minimap" width="180" height="120"></canvas>
       <div id="toasts"></div>
       <div id="banner" class="hidden"></div>
@@ -56,9 +55,9 @@
         <button data-act="bomb">💥</button>
       </div>`;
     bindTouch();
-    const menuBtn = document.getElementById('ingame-menu');
-    menuBtn.addEventListener('click', () => {
-      if (menuBtn.classList.contains('hidden')) return;
+    // 点击小地图 = 打开游戏菜单（不与键盘 Esc 冲突，移动端也可用）
+    const mm = document.getElementById('minimap');
+    if (mm) mm.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('echo-open-menu'));
     });
   }
@@ -93,7 +92,6 @@
   function updateHUD(game) {
     if (!game) return;
     document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('ingame-menu').classList.remove('hidden');
     const L = game.level;
     const shardsGot = L.shards.filter((s) => s.got).length;
     hudEls.floor = hudEls.floor || document.getElementById('hud-floor');
@@ -130,7 +128,6 @@
   }
   function hideHUD() {
     const h = document.getElementById('hud'); if (h) h.classList.add('hidden');
-    const m = document.getElementById('ingame-menu'); if (m) m.classList.add('hidden');
   }
 
   /* ---------------- 提示（统一翻译咽喉点） ---------------- */
