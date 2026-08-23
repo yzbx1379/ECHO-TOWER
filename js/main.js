@@ -75,6 +75,12 @@
       meta.muted = !meta.muted; A.setMuted(meta.muted); saveMeta(meta); titleScreen();
     }, 'ghost');
     mk(en ? '🌐 中文' : '🌐 English', () => { window.EchoLang.set(window.EchoLang.isEN() ? 'zh' : 'en'); titleScreen(); }, 'ghost');
+    if (document.documentElement.requestFullscreen) {
+      mk(en ? '🖥 Fullscreen' : '🖥 全屏（横屏推荐）', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(() => {});
+      }, 'ghost');
+    }
   }
 
   /* ---------------- 护符（元进度） ---------------- */
@@ -215,6 +221,16 @@
       titleScreen), 600);
   }
 
+  /* ---------------- 暂停菜单（Esc 与 ☰ 按钮共用） ---------------- */
+  function openPause() {
+    A.sfx('ui');
+    UI.pauseMenu(game, {
+      muted: A.muted,
+      toggleMute: () => { meta.muted = !meta.muted; A.setMuted(meta.muted); saveMeta(meta); },
+      quit: () => { localStorage.removeItem('echoTower.run'); finishRun(Object.assign(game.runSummary(), { dust: 0 })); },
+    });
+  }
+
   /* ---------------- 输入泵 ---------------- */
   function pump() {
     while (true) {
@@ -224,15 +240,7 @@
         if (act.action === 'confirm' && state === 'title') { /* 忽略 */ }
         continue;
       }
-      if (act.action === 'pause') {
-        A.sfx('ui');
-        UI.pauseMenu(game, {
-          muted: A.muted,
-          toggleMute: () => { meta.muted = !meta.muted; A.setMuted(meta.muted); saveMeta(meta); },
-          quit: () => { localStorage.removeItem('echoTower.run'); finishRun(Object.assign(game.runSummary(), { dust: 0 })); },
-        });
-        continue;
-      }
+      if (act.action === 'pause') { if (!UI.modalOpen) openPause(); continue; }
       if (UI.modalOpen) continue;
       if (act.action === 'bomb') { game.useBomb(); continue; }
       if (act.action === 'attack') { game.actionAttack(); continue; }
@@ -284,5 +292,8 @@
     requestAnimationFrame(loop);
   }
 
+  window.addEventListener('echo-open-menu', () => {
+    if (state === 'playing' && game && !game.over && !UI.modalOpen) openPause();
+  });
   window.addEventListener('DOMContentLoaded', boot);
 })();

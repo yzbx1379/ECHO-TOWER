@@ -101,6 +101,8 @@ const documentStub = {
   getElementById(id) { return registry[id] || null; },
   createElement: makeElement,
   body: makeElement('body'),
+  documentElement: Object.assign(makeElement('html'), { requestFullscreen() { return Promise.resolve(); } }),
+  fullscreenElement: null,
   addEventListener(ev, fn) { docListeners[ev] = fn; },
   dispatchEvent() { return true; },
 };

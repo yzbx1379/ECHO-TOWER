@@ -65,8 +65,31 @@ b { color: #fff; }
   font-size: 9px; color: #cfe0ff; text-shadow: 0 1px 2px #000; letter-spacing: 2px;
 }
 #minimap {
-  position: absolute; right: 12px; bottom: 12px; z-index: 25;
+  position: absolute; left: 12px; top: 12px; z-index: 25;
   border: 1px solid var(--line); border-radius: 8px; opacity: .9;
+}
+/* 小地图在左上角时，左侧信息条向右让位 */
+#hud { padding-left: 208px; }
+#ingame-menu {
+  position: absolute; top: 10px; right: 12px; z-index: 30;
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  font-size: 18px; font-family: var(--font); cursor: pointer;
+  backdrop-filter: blur(3px);
+}
+#ingame-menu:hover { border-color: rgba(143,227,136,.6); }
+
+/* 移动端横屏优化 */
+@media (orientation: landscape) and (max-height: 520px) {
+  #minimap { width: 150px; height: 100px; }
+  #hud { padding-left: 174px; }
+  .title-wrap { gap: 8px; padding: 16px; }
+  .title-name { font-size: 34px !important; letter-spacing: 10px !important; }
+  .btn-col.title-btns { min-width: 220px; }
+  #touch-pad { transform: scale(.82); transform-origin: bottom left; }
+  #action-pad { transform: scale(.85); transform-origin: bottom right; }
+  #action-pad .ap-main { width: 62px; height: 62px; font-size: 26px; }
+  #banner h2 { font-size: 28px; letter-spacing: 6px; }
 }
 
 /* ---------------- 提示条 ---------------- */
@@ -260,6 +283,7 @@ b { color: #fff; }
   .draft-row { flex-direction: column; }
   .shop-list { grid-template-columns: 1fr; }
   #minimap { width: 130px; height: 90px; }
+  #hud { padding-left: 152px; }
   #touch-pad { transform: scale(.9); transform-origin: bottom left; }
   #action-pad { transform: scale(.9); transform-origin: bottom right; }
 }
