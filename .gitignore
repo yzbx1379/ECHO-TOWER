@@ -9,9 +9,9 @@ node_modules/
 *.zip
 test/shot_*.png
 
+# 鏈湴澶囦唤鏂囦欢
+settings.yaml.backup
+
 # 绯荤粺鏂囦欢
 Thumbs.db
 .DS_Store
-
-# 本地备份文件
-settings.yaml.backup
