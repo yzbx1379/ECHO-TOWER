@@ -7,6 +7,7 @@ node_modules/
 .edge-profile*/
 .chrome-stderr.log
 *.zip
+test/shot_*.png
 
 # 系统文件
 Thumbs.db
