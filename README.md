@@ -95,4 +95,5 @@ node test/smoke.cjs      # 真浏览器截图（沙箱内被拦截时请在终�
 - 音频全部由 WebAudio 实时合成；图形全部由 Canvas 程序化绘制。
 - 存档位于 localStorage：`echoTower.run`（当前局）/ `echoTower.meta`(元进度)。
 
+
 *—— 塔记住了你的每一步。*
