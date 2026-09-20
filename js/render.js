@@ -44,10 +44,16 @@
     const x1 = Math.min(game.level.w - 1, Math.ceil((camX + W) / TS));
     const y1 = Math.min(game.level.h - 1, Math.ceil((camY + H) / TS));
 
-    /* ---- 地砖 ---- */
+    /* ---- 地砖：静态层离屏缓存 + 动态格逐帧重画 ---- */
+    const off = ensureStaticLayer(game);
+    const sw = (x1 - x0 + 1) * TS, sh = (y1 - y0 + 1) * TS;
+    ctx.drawImage(off, x0 * TS, y0 * TS, sw, sh, x0 * TS, y0 * TS, sw, sh);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        drawTile(ctx, game, x, y, pal, time);
+        const t = game.tileAt(x, y);
+        const hz = game.level.hazards.find((h) => h.x === x && h.y === y);
+        const hasHaz = hz && (t === T.FLOOR || t === T.RUBBLE);
+        if (!isStaticTile(t) || hasHaz) drawTile(ctx, game, x, y, pal, time);
       }
     }
     /* ---- 出口 / 碎片 / 宝箱 / 拾取物 ---- */
@@ -114,6 +120,69 @@
     const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+
+  /* ---------------- 静态地砖离屏缓存 ----------------
+   * 完全不变的地砖（WALL/FLOOR/ICE/WATER/RUBBLE/ARROW）画到离屏 Canvas，
+   * 楼层切换时重建；每帧只 drawImage + 重画动态格（LAVA/GATE/PLATE/PORTAL/
+   * VENT/PHASE/THIN/尖刺覆盖）。无需脏标记：缓存的类型永不变化。
+   */
+  const STATIC_TILES = new Set([T.WALL, T.FLOOR, T.ICE, T.WATER, T.RUBBLE, T.ARROW]);
+  function isStaticTile(t) { return STATIC_TILES.has(t); }
+  let _staticCanvas = null, _staticKey = null;
+  function ensureStaticLayer(game) {
+    const L = game.level;
+    const key = L.floor + ':' + L.biomeId + ':' + L.w + 'x' + L.h;
+    if (_staticCanvas && _staticKey === key) return _staticCanvas;
+    const off = document.createElement('canvas');
+    off.width = L.w * TS; off.height = L.h * TS;
+    const octx = off.getContext('2d');
+    const pal0 = L.biome.pal;
+    for (let y = 0; y < L.h; y++) {
+      for (let x = 0; x < L.w; x++) {
+        const t = L.grid[y * L.w + x];
+        if (!isStaticTile(t)) continue;
+        drawStaticTile(octx, game, x, y, pal0);
+      }
+    }
+    _staticCanvas = off; _staticKey = key;
+    return off;
+  }
+  function drawStaticTile(ctx, game, x, y, pal) {
+    const L = game.level;
+    const t = L.grid[y * L.w + x];
+    const px = x * TS, py = y * TS;
+    const alt = (x + y) % 2 === 0;
+    if (t === T.WALL) {
+      ctx.fillStyle = pal.wall; ctx.fillRect(px, py, TS, TS);
+      ctx.fillStyle = pal.wallTop; ctx.fillRect(px, py, TS, 4);
+      return;
+    }
+    ctx.fillStyle = alt ? pal.floor : pal.floorAlt;
+    ctx.fillRect(px, py, TS, TS);
+    switch (t) {
+      case T.ICE:
+        ctx.fillStyle = 'rgba(190,234,255,.34)'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4);
+        poly(ctx, [[px + 8, py + 8], [px + 16, py + 14], [px + 9, py + 20]], 'rgba(255,255,255,.35)');
+        break;
+      case T.WATER:
+        ctx.fillStyle = 'rgba(60,130,190,.5)'; ctx.fillRect(px + 2, py + 2, TS - 4, TS - 4);
+        break;
+      case T.RUBBLE:
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        for (let i = 0; i < 4; i++) ctx.fillRect(px + 5 + i * 7, py + 8 + ((i % 2) * 12), 5, 5);
+        break;
+      case T.ARROW: {
+        const m = game.metaAt(x, y) || {};
+        if (!m.dir) break;
+        ctx.save();
+        ctx.translate(px + TS / 2, py + TS / 2);
+        ctx.rotate(Math.atan2(m.dir[1], m.dir[0]));
+        poly(ctx, [[-6, -8], [8, 0], [-6, 8]], 'rgba(255,180,84,.65)');
+        ctx.restore();
+        break;
+      }
+    }
   }
 
   /* ---------------- 单格绘制 ---------------- */

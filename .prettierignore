@@ -1,0 +1,5 @@
+node_modules/
+.pw-browsers/
+test/shot_*.png
+*.min.js
+plan.md

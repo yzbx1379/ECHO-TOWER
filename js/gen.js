@@ -399,7 +399,7 @@
       const n = pois.length;
       const D = [];
       for (let i = 0; i < n; i++) {
-        const df = stateBFS(level, pois[i][0], pois[i][1]);
+        const df = (i === 0) ? dSpawn : stateBFS(level, pois[i][0], pois[i][1]);
         const row = [];
         for (let j = 0; j < n; j++) row.push(df[idx(pois[j][0], pois[j][1])]);
         D.push(row);

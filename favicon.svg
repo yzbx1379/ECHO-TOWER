@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="68%">
+      <stop offset="0%" stop-color="#1e1b34"/>
+      <stop offset="100%" stop-color="#0a0a12"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- 塔尖轮廓 -->
+  <path d="M32 12 L40 26 L24 26 Z" fill="none" stroke="#3a3358" stroke-width="1.5"/>
+  <path d="M28 26 L36 26 L36 50 L28 50 Z" fill="none" stroke="#3a3358" stroke-width="1.5"/>
+  <!-- 回声环 ⟲ -->
+  <g filter="url(#glow)" fill="none" stroke="#6ef2a0" stroke-width="3.4" stroke-linecap="round">
+    <path d="M44 34 A12 12 0 1 1 36 22"/>
+    <path d="M36 22 L33 18 M36 22 L40 19" stroke="#6ef2a0" stroke-width="3.4"/>
+  </g>
+  <circle cx="32" cy="34" r="2.6" fill="#6ef2a0" filter="url(#glow)"/>
+</svg>

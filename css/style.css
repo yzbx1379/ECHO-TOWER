@@ -249,6 +249,18 @@ b { color: #fff; }
 .help-box li::before { content: '◆'; position: absolute; left: 0; color: var(--green); font-size: 9px; top: 5px; }
 .help-box li b { color: #fff; }
 
+/* ---------------- 存档导入/导出 ---------------- */
+.saveio-box { min-width: 280px; max-width: 460px; }
+.saveio-box .dim.small { line-height: 1.55; margin-bottom: 12px; }
+.saveio-code {
+  width: 100%; min-width: 320px; box-sizing: border-box;
+  padding: 12px 14px; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px; line-height: 1.5; resize: vertical;
+  background: rgba(8,11,20,.92); color: var(--green);
+  border: 1px solid var(--line); border-radius: 10px; word-break: break-all;
+}
+.saveio-code:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 2px rgba(192,132,252,.18); }
+
 /* 触屏控件：左侧十字方向键（标准手柄布局），右侧动作按钮 */
 #touch-pad {
   position: absolute;
@@ -323,4 +335,18 @@ b { color: #fff; }
   #hud-steps .dim { display: none; } /* 窄屏隐藏最短步数注释，防拥挤 */
   #touch-pad { transform: scale(.88); transform-origin: bottom left; }
   #action-pad { transform: scale(.9); transform-origin: bottom right; }
+}
+
+/* ============================================================
+   可访问性：前庭敏感用户请求“减少动态效果”时，关闭非必要动画
+   （震屏/粒子在 core.js 由 reducedMotion() 已降级；此处关闭 CSS 过渡）
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .modal { animation: none !important; }
 }

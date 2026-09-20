@@ -8,8 +8,8 @@
   const D = window.EchoData;
   /* —— 国际化辅助：LANG() 取运行时，nm/ds 按当前语言取数据字段 —— */
   const LANG = () => window.EchoLang || { t: (s) => s, isEN: () => false };
-  const nm = (x) => { const g = LANG(); return (g.isEN() && x.nameE) ? x.nameE : x.name; };
-  const ds = (x) => { const g = LANG(); return (g.isEN() && x.descE) ? x.descE : x.desc; };
+  const nm = (x) => LANG().tr(x);
+  const ds = (x) => LANG().tr(x, 'desc');
 
   let root = null, hudEls = {}, toastTimer = null;
 
@@ -303,9 +303,37 @@
     const close = modal(box);
   }
 
+  /* ---------------- 存档导入/导出 ---------------- */
+  function openSaveIO(opts) {
+    const en = LANG().isEN();
+    const box = el('div', 'saveio-box');
+    box.appendChild(el('h3', null, en ? '💾 Save Code' : '💾 存档码'));
+    box.appendChild(el('p', 'dim small', en
+      ? 'Back up your dust / charms / best floor. Paste the code on another device to restore.'
+      : '备份你的回尘 / 护符 / 最佳层数。在另一台设备粘贴此码即可恢复。'));
+    const ta = el('textarea', 'saveio-code');
+    ta.rows = 5; ta.spellcheck = false;
+    ta.placeholder = en ? 'Paste a save code here, or click Generate below…' : '在此粘贴存档码，或点击下方「生成」…';
+    box.appendChild(ta);
+    const row = el('div', 'btn-row');
+    const exp = el('button', 'btn', en ? '📋 Generate' : '📋 生成存档码');
+    exp.onclick = () => { ta.value = opts.onExport() || ''; ta.focus(); ta.select(); };
+    const imp = el('button', 'btn primary', en ? '⬇ Import' : '⬇ 导入');
+    imp.onclick = () => {
+      const code = (ta.value || '').trim();
+      if (!code) { toast(en ? 'Paste a code first' : '请先粘贴存档码'); return; }
+      if (opts.onImport(code)) { close(); opts.onBack && opts.onBack(); }
+    };
+    const back = el('button', 'btn ghost', en ? '← Back' : '← 返回');
+    back.onclick = () => { close(); opts.onBack && opts.onBack(); };
+    row.append(exp, imp, back);
+    box.appendChild(row);
+    const close = modal(box);
+  }
+
   window.EchoUI = {
     init, updateHUD, hideHUD, toast, banner, openDraft, openShop,
-    gameOver, victory, pauseMenu, help,
+    gameOver, victory, pauseMenu, help, openSaveIO,
     get modalOpen() {
       const l = document.getElementById('modal-layer');
       return l && !l.classList.contains('hidden');

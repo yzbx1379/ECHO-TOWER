@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   const D = window.EchoData, C = window.EchoCore, R = window.EchoRender,
-    A = window.EchoAudio, UI = window.EchoUI;
+    A = window.EchoAudio, UI = window.EchoUI, L = window.EchoLang;
 
   let canvas, mctx, ctx;
   let game = null;
@@ -14,11 +14,16 @@
 
   /* ---------------- 元进度 ---------------- */
   function loadMeta() {
-    try { return Object.assign(defaultMeta(), JSON.parse(localStorage.getItem(META_KEY)) || {}); }
+    let parsed;
+    try { parsed = JSON.parse(localStorage.getItem(META_KEY)) || {}; }
     catch (e) { return defaultMeta(); }
+    // 版本迁移：旧存档无 v 视为 v1，补默认字段并回写持久化
+    const m = Object.assign(defaultMeta(), parsed);
+    if (!m.v) { m.v = 1; saveMeta(m); }
+    return m;
   }
   function defaultMeta() {
-    return { best: 0, dust: 0, runs: 0, wins: 0, charmsOwned: [], endlessUnlocked: false, muted: false };
+    return { v: 1, best: 0, dust: 0, runs: 0, wins: 0, charmsOwned: [], endlessUnlocked: false, muted: false };
   }
   function saveMeta(m) { localStorage.setItem(META_KEY, JSON.stringify(m)); }
   let meta = loadMeta();
@@ -34,6 +39,10 @@
     A.setMuted(meta.muted);
     titleScreen();
     requestAnimationFrame(loop);
+    /* PWA：注册 service worker（file:// 或沙箱不支持时静默失败） */
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
   }
 
   /* ---------------- 标题 ---------------- */
@@ -84,18 +93,47 @@
   }
 
   /* ---------------- 护符（元进度） ---------------- */
+  /* ---------------- 存档导入/导出（Base64 编码的 JSON） ---------------- */
+  function exportSaveCode() {
+    const m = loadMeta();
+    let run = null;
+    try { run = JSON.parse(localStorage.getItem('echoTower.run')); } catch (e) { run = null; }
+    return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, meta: m, run })))); // UTF-8 安全
+  }
+  function importSaveCode(code) {
+    const en = window.EchoLang.isEN();
+    try {
+      const payload = JSON.parse(decodeURIComponent(escape(atob(code))));
+      if (!payload || payload.v !== 1) throw new Error('version');
+      if (payload.meta && typeof payload.meta === 'object') {
+        meta = Object.assign(defaultMeta(), payload.meta); meta.v = 1; saveMeta(meta);
+      }
+      if (payload.run && typeof payload.run === 'object') {
+        localStorage.setItem('echoTower.run', JSON.stringify(payload.run));
+      }
+      UI.toast(en ? '✓ Save restored' : '✓ 存档已恢复');
+      return true;
+    } catch (e) {
+      UI.toast(en ? 'Invalid save code' : '存档码无效或已损坏');
+      return false;
+    }
+  }
+  /* 供自动化测试（dom-stub）直接往返验证；生产环境无副作用 */
+  if (typeof window !== 'undefined') window.__echoSaveIO = { export: exportSaveCode, import: importSaveCode };
+
   function charmScreen() {
     state = 'charms';
     const en = window.EchoLang.isEN();
     const root = document.getElementById('screen-root');
     root.innerHTML = `<div class="title-wrap"><h1 class="title-name small">◈ ${en ? 'Monuments' : '塔碑'}</h1>
       <p class="title-sub">${en ? `Dust ✦${meta.dust} — engrave eternal charms with it` : `回尘 ✦${meta.dust} —— 用它铸刻永恒的护符`}</p><div class="charm-grid" id="charm-grid"></div>
+      <button class="btn ghost" id="charm-saveio">💾 ${en ? 'Save Import / Export' : '存档导入 / 导出'}</button>
       <button class="btn ghost" id="charm-back">${en ? '← Back to Gate' : '← 返回塔门'}</button></div>`;
     const grid = root.querySelector('#charm-grid');
     for (const ch of D.CHARMS) {
       const owned = meta.charmsOwned.includes(ch.id);
-      const cn = en && ch.nameE ? ch.nameE : ch.name;
-      const cd = en && ch.descE ? ch.descE : ch.desc;
+      const cn = L.tr(ch);
+      const cd = L.tr(ch, 'desc');
       const card = document.createElement('button');
       card.className = 'charm-card' + (owned ? ' owned' : meta.dust >= ch.cost ? '' : ' locked');
       card.innerHTML = `<strong>${cn}</strong><span>${cd}</span><b>${owned ? (en ? '✓ Engraved' : '✓ 已铸刻') : `✦${ch.cost}`}</b>`;
@@ -108,6 +146,9 @@
       grid.appendChild(card);
     }
     root.querySelector('#charm-back').onclick = titleScreen;
+    root.querySelector('#charm-saveio').onclick = () => {
+      UI.openSaveIO({ onExport: exportSaveCode, onImport: importSaveCode, onBack: charmScreen });
+    };
   }
 
   /* ---------------- 职业选择 ---------------- */
@@ -118,7 +159,7 @@
     const root = document.getElementById('screen-root');
     root.innerHTML = `<div class="title-wrap">
       <h1 class="title-name small">${en ? 'Choose Your Warden' : '选择你的守塔人'}</h1>
-      ${equipped.length ? `<p class="tiny dim">${en ? 'Charms active: ' : '护符生效：'}${equipped.map(c => en && c.nameE ? c.nameE : c.name).join(' · ')}</p>` : ''}
+      ${equipped.length ? `<p class="tiny dim">${en ? 'Charms active: ' : '护符生效：'}${equipped.map(c => L.tr(c)).join(' · ')}</p>` : ''}
       <div class="class-row" id="class-row"></div>
       <button class="btn ghost" id="cls-back">${en ? '← Back' : '← 返回'}</button></div>`;
     const row = root.querySelector('#class-row');
@@ -126,7 +167,7 @@
       const card = document.createElement('button');
       card.className = 'class-card';
       card.style.setProperty('--cc', cls.color);
-      card.innerHTML = `<h3 style="color:${cls.color}">${en && cls.nameE ? cls.nameE : cls.name}</h3><p class="en">${cls.en}</p><p>${en && cls.descE ? cls.descE : cls.desc}</p>`;
+      card.innerHTML = `<h3 style="color:${cls.color}">${L.tr(cls)}</h3><p class="en">${cls.en}</p><p>${L.tr(cls, 'desc')}</p>`;
       card.onclick = () => startRun(cls.id);
       row.appendChild(card);
     }
@@ -155,7 +196,7 @@
         const fl = level.floor;
         const b = D.bossOf(fl);
         if (b) {
-          const bn = en && b.nameE ? b.nameE : b.name;
+          const bn = L.tr(b);
           UI.banner(`${en ? '⚠ Floor' : '⚠ 第'} ${fl} ${en ? '' : '层'}`, `${bn} — ${b.title}`);
         } else {
           UI.banner(en ? `Floor ${fl}` : `第 ${fl} 层`, `${level.biome.name} · ${level.biome.en}`);

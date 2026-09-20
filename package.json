@@ -8,9 +8,15 @@
     "test:gen": "node test/gen.test.cjs",
     "test:sim": "node test/sim.test.cjs",
     "test:ui": "node test/dom-stub.cjs",
-    "smoke:browser": "node test/smoke.cjs"
+    "smoke:browser": "node test/smoke.cjs",
+    "lint": "eslint js/ test/",
+    "lint:fix": "eslint js/ test/ --fix",
+    "format": "prettier --write \"js/**/*.js\" \"test/**/*.cjs\"",
+    "format:check": "prettier --check \"js/**/*.js\" \"test/**/*.cjs\""
   },
   "devDependencies": {
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0"
   }
 }

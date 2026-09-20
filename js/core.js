@@ -17,6 +17,12 @@
     };
   }
 
+  /* ---------------- 可访问性：减少动态效果 ---------------- */
+  function reducedMotion() {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+    catch (e) { return false; }
+  }
+
   /* ---------------- 相机 ---------------- */
   const camera = {
     x: 0, y: 0, shakeT: 0, shakeMag: 0,
@@ -25,7 +31,7 @@
       this.y += (ty - this.y) * (lerp == null ? 0.12 : lerp);
     },
     snap(tx, ty) { this.x = tx; this.y = ty; },
-    shake(mag, dur) { this.shakeMag = Math.max(this.shakeMag, mag); this.shakeT = Math.max(this.shakeT, dur || 0.25); },
+    shake(mag, dur) { if (reducedMotion()) return; this.shakeMag = Math.max(this.shakeMag, mag); this.shakeT = Math.max(this.shakeT, dur || 0.25); },
     offset(dt) {
       if (this.shakeT > 0) {
         this.shakeT -= dt;
@@ -41,7 +47,8 @@
   const particles = [];
   function burst(wx, wy, color, n, opt) {
     opt = opt || {};
-    for (let i = 0; i < (n || 8); i++) {
+    const cnt = reducedMotion() ? Math.max(1, (n || 8) >> 1) : (n || 8);
+    for (let i = 0; i < cnt; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = (opt.speed || 60) * (0.4 + Math.random());
       particles.push({

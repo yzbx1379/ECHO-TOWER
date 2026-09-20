@@ -135,5 +135,13 @@
     return out;
   }
 
-  window.EchoLang = { get lang() { return lang; }, set, t, isEN };
+  /* 数据字段本地化：按当前语言取 obj.nameE||obj.name（或指定字段） */
+  function tr(obj, field) {
+    field = field || 'name';
+    if (!obj) return '';
+    const e = obj[field + 'E'];
+    return isEN() && e ? e : obj[field];
+  }
+
+  window.EchoLang = { get lang() { return lang; }, set, t, tr, isEN };
 })();

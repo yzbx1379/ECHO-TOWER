@@ -118,6 +118,9 @@ global.self = global;
 global.document = documentStub;
 try { global.navigator = { userAgent: 'stub' }; } catch (e) { /* Node22 只读 */ }
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
+/* Base64 编解码：Node 16+ 已全局内置，老环境兜底 */
+global.btoa = global.btoa || ((s) => Buffer.from(s, 'binary').toString('base64'));
+global.atob = global.atob || ((s) => Buffer.from(s, 'base64').toString('binary'));
 global.CustomEvent = class { constructor(type, o) { this.type = type; this.detail = o && o.detail; } };
 global.requestAnimationFrame = () => 0; // 不跑渲染循环
 global.performance = { now: () => Date.now() };
@@ -248,6 +251,31 @@ UI.toast('⚙ 机关栅栏开启了！');
   ok(last && last.innerHTML.includes('gate swung open'), `EN toast 翻译: "${last && last.innerHTML}"`);
 }
 window.EchoLang.set('zh');
+
+/* 存档导入/导出往返 */
+{
+  const SIO = window.__echoSaveIO;
+  ok(SIO && typeof SIO.export === 'function' && typeof SIO.import === 'function', '存档导入/导出接口已挂载');
+  // 设一个带回尘的 meta + 一局 run
+  localStorage._d = {};
+  localStorage.setItem('echoTower.meta', JSON.stringify({ v:1, best:42, dust:99, runs:5, wins:1, charmsOwned:[], endlessUnlocked:true, muted:false }));
+  localStorage.setItem('echoTower.run', JSON.stringify({ v:1, seed:1, floor:3, classId:'knight', charms:[], relicIds:[], gold:0, dust:0, bombs:0, keys:0, xp:0, lv:1, hp:6, bonus:{maxHp:0,atk:0}, lastRecording:[], runStats:{kills:0,stepsTotal:0,shardsTotal:0,startTime:0}, reviveUsed:{phoenix:false,charm:false} }));
+  const code = SIO.export();
+  ok(typeof code === 'string' && code.length > 20, `导出存档码 (len=${code && code.length})`);
+  // 清除后导入应恢复
+  localStorage.removeItem('echoTower.meta');
+  localStorage.removeItem('echoTower.run');
+  ok(localStorage.getItem('echoTower.meta') === null, '清除 meta 后为空');
+  const imported = SIO.import(code);
+  ok(imported === true, '导入返回 true');
+  const m = JSON.parse(localStorage.getItem('echoTower.meta'));
+  ok(m && m.dust === 99 && m.best === 42 && m.v === 1, `meta 恢复 dust=${m && m.dust} best=${m && m.best} v=${m && m.v}`);
+  const r = JSON.parse(localStorage.getItem('echoTower.run'));
+  ok(r && r.floor === 3 && r.classId === 'knight', `run 恢复 floor=${r && r.floor} class=${r && r.classId}`);
+  // 篡改码被拒
+  const bad = SIO.import('!!!这不是有效存档码!!!');
+  ok(bad === false, '篡改码被拒');
+}
 
 console.log('—'.repeat(40));
 if (fail) { console.error(`✗ ${fail} 项失败`); process.exit(1); }

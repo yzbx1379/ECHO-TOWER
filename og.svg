@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="#1a1630"/>
+      <stop offset="60%" stop-color="#0d0b1a"/>
+      <stop offset="100%" stop-color="#050509"/>
+    </radialGradient>
+    <linearGradient id="echo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6ef2a0"/>
+      <stop offset="100%" stop-color="#3ad0ff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0 L0 0 0 40" fill="none" stroke="#211d3a" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)" opacity="0.55"/>
+  <!-- 远景塔影 -->
+  <g opacity="0.35" fill="#15121f">
+    <path d="M120 520 L160 520 L156 360 L140 280 L124 360 Z"/>
+    <path d="M1040 540 L1080 540 L1076 400 L1062 330 L1048 400 Z"/>
+  </g>
+  <!-- 回声环 -->
+  <g transform="translate(300 315)" filter="url(#glow)" fill="none" stroke="url(#echo)" stroke-width="22" stroke-linecap="round">
+    <path d="M90 0 A90 90 0 1 1 0 -90"/>
+    <path d="M0 -90 L-24 -120 M0 -90 L34 -116"/>
+  </g>
+  <circle cx="300" cy="315" r="20" fill="#6ef2a0" filter="url(#glow)"/>
+  <!-- 标题 -->
+  <g font-family="'ZCOOL QingKe HuangYou','Microsoft YaHei',sans-serif" fill="#f3f3f3">
+    <text x="470" y="290" font-size="118" letter-spacing="4">回声之塔</text>
+    <text x="470" y="370" font-size="64" fill="#9aa0c0" letter-spacing="6">E C H O · T O W E R</text>
+    <text x="470" y="430" font-size="34" fill="#6ef2a0" letter-spacing="2">100 层 · 你的每一步都会被重演</text>
+  </g>
+  <text x="470" y="540" font-family="monospace" font-size="24" fill="#5a5470">⟲ turn-based roguelite · pure HTML5 canvas · zero dependency</text>
+</svg>

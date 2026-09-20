@@ -1,0 +1,17 @@
+{
+  "name": "回声之塔 · ECHO TOWER",
+  "short_name": "回声之塔",
+  "description": "100 层回声重演爬塔 Roguelite · 纯 HTML5 Canvas · 零依赖 · 打开即玩",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#07090f",
+  "theme_color": "#0d0b1a",
+  "start_url": "./index.html",
+  "scope": "./",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
