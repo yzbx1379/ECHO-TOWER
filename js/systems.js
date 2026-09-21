@@ -33,6 +33,7 @@
       this.turnCount = 0; this.stepsThisFloor = 0;
       this.recording = [];           // 本层指令录像
       this.pendingSlams = [];        // 预警落点
+      this.dirtyCells = new Set();   // 运行中 grid 变化标记（render 离屏缓存脏标记）
       this.tempLava = [];            // 临时熔岩
       this.beams = [];               // 激光表现
       this.projectiles = [];
@@ -334,7 +335,7 @@
         m.cracks = (m.cracks || 0) + 1;
         this.level.meta[this.idx(x, y)] = m;
         if (m.cracks >= 2) {
-          this.level.grid[this.idx(x, y)] = T.WATER;
+          this.level.grid[this.idx(x, y)] = T.WATER; this.dirtyCells.add(this.idx(x, y));
           this.fx.burst(x, y, '#7fd8ff', 10);
           this.fx.sfx('spike');
         }
@@ -797,7 +798,7 @@
           this.fx.burst(tx, ty, '#ff7847', 6);
           const t = this.tileAt(tx, ty);
           if ((t === T.WALL || t === T.PHASE) && isPlayerBomb && Math.abs(dx) + Math.abs(dy) <= 1 && tx > 0 && ty > 0 && tx < this.level.w - 1 && ty < this.level.h - 1) {
-            this.level.grid[this.idx(tx, ty)] = T.RUBBLE; // 炸墙开路
+            this.level.grid[this.idx(tx, ty)] = T.RUBBLE; this.dirtyCells.add(this.idx(tx, ty)); // 炸墙开路
           }
         }
       }
@@ -1162,7 +1163,7 @@
         const x = bx + Math.floor(this.rng() * (radius * 2 + 1)) - radius;
         const y = by + Math.floor(this.rng() * (radius * 2 + 1)) - radius;
         if (!this.inBounds(x, y) || this.tileAt(x, y) !== T.FLOOR) continue;
-        this.level.grid[this.idx(x, y)] = T.ARROW;
+        this.level.grid[this.idx(x, y)] = T.ARROW; this.dirtyCells.add(this.idx(x, y));
         this.level.meta[this.idx(x, y)] = { dir: [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(this.rng() * 4)] };
         placed++;
       }

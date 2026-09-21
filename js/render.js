@@ -133,7 +133,22 @@
   function ensureStaticLayer(game) {
     const L = game.level;
     const key = L.floor + ':' + L.biomeId + ':' + L.w + 'x' + L.h;
-    if (_staticCanvas && _staticKey === key) return _staticCanvas;
+    if (_staticCanvas && _staticKey === key) {
+      // 运行中 grid 被改写（炸弹炸墙/薄冰变水/地砖变箭头）时，
+      // 局部重绘脏格到离屏缓存，否则缓存保留旧值导致视觉错乱。
+      if (game.dirtyCells && game.dirtyCells.size) {
+        const octx = _staticCanvas.getContext('2d');
+        const pal0 = L.biome.pal;
+        for (const ci of game.dirtyCells) {
+          const cx = ci % L.w, cy = (ci / L.w) | 0;
+          octx.clearRect(cx * TS, cy * TS, TS, TS);
+          const ct = L.grid[ci];
+          if (isStaticTile(ct)) drawStaticTile(octx, game, cx, cy, pal0);
+        }
+        game.dirtyCells.clear();
+      }
+      return _staticCanvas;
+    }
     const off = document.createElement('canvas');
     off.width = L.w * TS; off.height = L.h * TS;
     const octx = off.getContext('2d');
