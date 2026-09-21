@@ -277,6 +277,23 @@ window.EchoLang.set('zh');
   ok(bad === false, '篡改码被拒');
 }
 
+/* 渲染层：离屏缓存脏格消费（炸弹炸墙视觉 bug 回归保障） */
+{
+  const game = window.EchoGame.create({ seed: 999, floor: 1, classId: 'knight', fx: { toast(){}, shake(){}, burst(){}, floatText(){}, sfx(){}, hitstop(){}, flashTile(){}, updateHUD(){}, onMusicBiome(){}, onMusicIntensity(){}, onFloorStart(){}, openDraft(){}, openShop(){}, onGameOver(){}, onVictory(){} } })
+  game.player.px = game.player.x; game.player.py = game.player.y
+  const canvas = document.getElementById('game')
+  const ctx = canvas.getContext('2d')
+  // 第一次 render：建立离屏缓存
+  window.EchoRender.render(ctx, game, canvas, 0)
+  ok(game.dirtyCells.size === 0, '初始 dirtyCells 为空')
+  // 模拟炸弹炸墙：标记一个脏格（走局部重绘路径）
+  game.dirtyCells.add(game.idx(5, 5))
+  ok(game.dirtyCells.size === 1, `标记 1 个脏格 (${game.dirtyCells.size})`)
+  // 第二次 render：命中缓存，应消费脏格并清空
+  window.EchoRender.render(ctx, game, canvas, 0.1)
+  ok(game.dirtyCells.size === 0, `脏格已消费 (${game.dirtyCells.size} 剩余)`)
+}
+
 console.log('—'.repeat(40));
 if (fail) { console.error(`✗ ${fail} 项失败`); process.exit(1); }
 console.log(`✓ DOM 桩冒烟测试全部通过（${pass} 项）`);
