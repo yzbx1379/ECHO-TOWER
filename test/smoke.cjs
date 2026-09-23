@@ -78,7 +78,7 @@ const ok = (cond, msg) => {
   await page.reload();
   await page.waitForSelector('.title-name', { timeout: 5000 });
   await page.waitForTimeout(1500); // SW install + skipWaiting + activate
-  const sw = await page.evaluate(() => navigator.serviceWorker.getRegistration());
+  const sw = await page.evaluate(async () => await navigator.serviceWorker.getRegistration());
   ok(!!sw, 'SW registered: ' + (sw ? sw.scope : 'N/A'));
 
   // ── 4. 开局 → 选职业
@@ -93,7 +93,7 @@ const ok = (cond, msg) => {
   // ── 5. HUD + 楼层
   ok(await page.locator('#hud').isVisible(), 'HUD 可见');
   const floorText = (await page.locator('#hud-floor').innerText()).replace(/\s+/g, ' ');
-  ok(/第\s*\d+/.test(floorText), '楼层显示: ' + floorText);
+  ok(/第\s*\d+|Floor\s*\d+/i.test(floorText), '楼层显示: ' + floorText);
 
   // ── 6. 键盘移动 12 步
   const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'];
