@@ -123,7 +123,7 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
   - `package.json` 加 devDependencies + `lint`/`format` scripts
   - 可选:`.github/workflows/ci.yml` 跑 `npm test` + lint
 - **验收**:`npm run lint` 无 error;`npm run format --check` 通过(或先 `format` 一次统一)。
-- **状态**:✅ 配置完成(2026-08-23)。新增 `.eslintrc.cjs`(8 条宽松规则:no-undef error、no-unused-vars/no-fallthrough/eqeqeq warn;test/*.cjs 用 node env;忽略 .pw-browsers/shot_*.png)、`.prettierrc`(printWidth 120/semi false/singleQuote/trailingComma all,贴近现有风格)、`.prettierignore`;package.json 加 `lint`/`lint:fix`/`format`/`format:check` scripts + eslint/prettier devDeps。配置语法已验证(8 rules 解析正常)。**lint/format 实际运行待用户本地 `npm install`**(npm 在此沙箱被执行策略禁用)。CI workflow 未加(GitHub Pages 用分支式部署,无 CI 需求时不必加)。
+- **状态**:✅ 配置完成(2026-08-23)。新增 `.eslintrc.cjs`(8 条宽松规则:no-undef error、no-unused-vars/no-fallthrough/eqeqeq warn;test/*.cjs 用 node env;忽略 .pw-browsers/shot_*.png)、`.prettierrc`(printWidth 120/semi false/singleQuote/trailingComma all,贴近现有风格)、`.prettierignore`;package.json 加 `lint`/`lint:fix`/`format`/`format:check` scripts + eslint/prettier devDeps。配置语法已验证(8 rules 解析正常)。**lint/format 实际运行待用户本地 `npm install`**(npm 在此沙箱被执行策略禁用)。CI workflow 已加(`.github/workflows/ci.yml`:push/PR 到 main 触发,两个并行 job——Node 测试 + Playwright 浏览器冒烟;lint 未纳入 CI 因配置尚未验证通过,待本地跑通后再加)。
 
 ### 10. 生成器 `dSpawn` 复用
 - **目标**:消除 `buildOnce` 40 次试探里对 `spawn` 重复的 stateBFS。
@@ -168,4 +168,7 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
 | 2026-08-23 | ⏸️ 任务8:Web Worker 推迟(用户确认,gen 6ms/峰94ms 收益边际) |
 | 2026-08-23 | ✅ 任务9:ESLint+Prettier 配置(8 规则),待 npm install 跑 lint |
 | 2026-08-23 | ✅ 任务10:dSpawn 复用,gen 峰值 88→61ms(-30%),回归全绿 |
+| 2026-08-23 | 🐛 修复离屏缓存过时 bug:dirtyCells 标记+局部重绘(炸弹/薄冰/地砖改格视觉错乱) |
+| 2026-08-23 | 🧪 render 脏格回归测试(dom-stub 26→29 项),填补 render.js 零测试盲区 |
+| 2026-08-23 | 🚀 GitHub Actions CI:Node 测试 + Playwright 冒烟(含 SW/manifest 断言) |
 | 2026-08-23 | 🏁 核心 1-10 完成(8 推迟);11-14 未实施,plan 记录在案,可随时重启 |
