@@ -108,11 +108,12 @@ node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
 node test/static.test.cjs         # 76 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单与 SW 版本化）
 node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三分辨率/触屏/小字号/SW 离线回落）
+npm run test:survival          # 观测工具（非门禁）：真实 HP 下机器人死亡楼层分布
 ```
 
 `npm test` 依次执行 `gen` → `sim` → `combat` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、导航请求 network-first。
 
-> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 39/51/51、static 76/76）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**本轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，而致死判定在其后，导致玩家永不死亡、凤羽烬/不灭烛/失败结算全部失效；现改用扣血后的 `lethal` 判定（combat.test.cjs 第 13–19 项固化）。仍不记作「达标」——真实设备字体渲染差异不在自动化覆盖内。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 48/60/60、static 76/76）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
 
 ## 🐞 调试模式
 
@@ -125,7 +126,7 @@ node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三�
 | 屏幕左下叠层 | 楼层 / seed / 坐标、`OPT` 生成器保证步数 vs 本层实际步数、录像帧数与回声状态、碎片/出口锁/HP、无敌状态 |
 | 控制台 `__echoDebug` | `jump(n)` / `toggleInvuln()` / `state`，便于脚本化复现 |
 
-调试 flag **关闭时不注册按键监听、不挂全局 API、不绘制叠层**，正式玩法路径零变化；两种开启通路与「关闭时零副作用」都由 `dom-stub.cjs` 三种模式回归覆盖。调试跳层会把运行时随机流重置为该层的规范种子，保证同一 seed + 层号得到同一布局。
+调试 flag **关闭时不注册按键监听、不挂全局 API、不绘制叠层**，正式玩法路径零变化；两种开启通路与「关闭时零副作用」都由 `dom-stub.cjs` 三种模式回归覆盖。调试跳层会把运行时随机流重置为该层的规范种子，保证同一 seed + 层号得到同一布局；**但它不复现「从 F1 连续爬上来」的 rng 连续流**（那段随机消耗没有被记录）。调试叠层第 6 行明示 `rng=per-floor seed (jump != climb)`，`dom-stub.cjs` 已把该差异锁为设计行为回归——这是取舍，不是 bug。
 
 ## ♿ 色盲友好
 
@@ -140,6 +141,7 @@ node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三�
 - 楼层预生成：`js/gen.worker.js` 在 Worker 中跑 Dijkstra + Held-Karp，`js/prefetch.js` 负责首层异步生成与下一层预取；`nextFloor()` 保持同步语义，命中缓存即零阻塞。`file://` 双击、DOM 桩、Worker 加载失败一律走同步 fallback，双击 `index.html` 仍可玩。`sim.test.cjs` 不加载该模块，端到端模拟确定性不受影响。
 - PWA 缓存：`sw.js` 的缓存名由 `ASSETS` 清单内容（FNV-1a）自动派生，清单变化即换缓存、activate 清旧缓存；导航请求 network-first，离线时回落预缓存（`smoke.cjs` 实测断网 reload 仍可打开）。不再需要人工 bump 版本号。
 - 存档确定性：`mulberry32` 暴露 `getState/setState`，`snapshot()` 新增可选 `rng` 整数（存档 `v: 1` 不变），`restoreFrom()` 有则恢复。续爬后的暴击 / 闪避 / 掉落 / 商店随机流与首次连续游玩逐位一致；旧存档缺该字段时保持原行为，无需迁移。
+- 平衡性：`npm run test:survival` 是可重复的难度下界观测，**不是门禁**。机器人不主动躲避 / 攻击 / 用技能 / 购物，实测数据不可外推为真人难度，因此修复「玩家不会死」后**未调整任何平衡参数**；真实 HP 下的可通关性 / 难度仍需人工试玩拍板。
 - `package-lock.json` 原为陈旧文件（`"name": "geom"` 且无 devDependencies），2026-10-24 随 `npm install` 重建为 `echo-tower` 并补全 3 个 devDependencies，使 `npm ci` 可用；仅安装期依赖，不进入运行时。
 - CI（`.github/workflows/ci.yml`）三个并行 job：Node 测试、ESLint + Prettier（lint + format:check）、Playwright 浏览器冒烟。
 

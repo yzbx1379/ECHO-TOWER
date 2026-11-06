@@ -588,6 +588,58 @@ if (STUB_DEBUG) {
   ok(typeof window.EchoRender.drawDebugOverlay === 'function', '调试叠层已导出但主循环不会调用')
 }
 
+/* mixin 方法名唯一性：systems.js 启动期已做冲突拒绝，这里显式核对无静默覆盖 */
+{
+  const names = (window.EchoSystemsParts || []).flatMap((M) =>
+    Object.getOwnPropertyNames(M.prototype).filter((k) => k !== 'constructor'),
+  )
+  ok(
+    names.length === new Set(names).size && window.EchoSystemsMethodCount === names.length,
+    `mixin 方法名唯一: ${names.length} 个，无静默覆盖`,
+  )
+}
+
+/* Worker 失效后状态一致性：用假 Worker + 桩计时器同步触发超时路径 */
+{
+  const modPath = path.join(__dirname, '..', 'js', 'prefetch.js')
+  let terminated = false
+  class FakeWorker {
+    postMessage() {} // 永不回消息，等超时
+    terminate() {
+      terminated = true
+    }
+  }
+  global.Worker = FakeWorker
+  delete require.cache[require.resolve(modPath)]
+  require(modPath)
+  const PF = window.EchoPrefetch
+  ok(PF.enabled() === true, '假 Worker 下 EchoPrefetch.enabled() 为 true')
+  PF.generate(123, 1, { timeoutMs: 10 }) // 不 await：dom-stub 的 setTimeout 是收集器
+  const timeoutFn = timeouts[timeouts.length - 1]
+  ok(typeof timeoutFn === 'function', '超时回调已注册到桩计时器')
+  timeoutFn() // 同步触发超时 → disableWorker
+  ok(PF.enabled() === false && PF.stats().enabled === false, '超时后 enabled() 与 stats().enabled 一致为 false')
+  ok(terminated === true, '超时后 Worker 已 terminate，不再残留实例')
+  ok(PF.generateSync(123, 1).floor === 1, '失效后同步生成仍可用')
+  // 恢复成「无 Worker」状态，避免影响后续断言
+  delete global.Worker
+  delete require.cache[require.resolve(modPath)]
+  require(modPath)
+}
+
+/* 调试跳层 vs 连续爬塔的 rng 差异：锁定为设计行为，防止被误判为 bug 而改动 */
+{
+  const g = window.EchoGame.create({ seed: 31415, floor: 1, classId: 'knight' })
+  g.nextFloor() // F1 → F2：正常流程保持连续随机流
+  const continuous = g.rng.getState()
+  const seededF2 = (g.seed ^ (2 * 2654435761)) >>> 0
+  ok(continuous !== seededF2, 'nextFloor 保持连续随机流（不等于该层派生种子）')
+  g.debugJumpFloor(3) // F2 → F5
+  ok(g.rng.getState() === (g.seed ^ (5 * 2654435761)) >>> 0, '调试跳层使用目标层派生种子（可复现布局）')
+  g.nextFloor()
+  ok(g.rng.getState() !== (g.seed ^ (6 * 2654435761)) >>> 0, '从调试层继续爬仍走连续流')
+}
+
 console.log('—'.repeat(40))
 if (fail) {
   console.error(`✗ ${fail} 项失败`)

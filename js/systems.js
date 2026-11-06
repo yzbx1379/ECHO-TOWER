@@ -316,12 +316,22 @@
 
   /* 合并按域拆分的 mixin：用属性描述符复制，保留原有的可枚举/可写特性，
    * 且 mixin 内部方法之间仍是普通 this.xxx() 调用，无需改任何调用点。 */
+  const seenMethods = new Map()
   for (const M of window.EchoSystemsParts || []) {
     for (const k of Object.getOwnPropertyNames(M.prototype)) {
       if (k === 'constructor') continue
+      /* 拆分后新增方法若与既有方法撞名，原先会被后加载的 mixin 静默覆盖，
+       * 症状要到运行时才暴露。这里在启动期直接拒绝，属于快速失败。 */
+      if (seenMethods.has(k)) {
+        throw new Error(
+          `[systems] mixin 方法名冲突: ${k} 同时定义在 ${seenMethods.get(k)} 与 ${M.name}；后加载者会静默覆盖前者，已拒绝启动`,
+        )
+      }
+      seenMethods.set(k, M.name)
       Object.defineProperty(Game.prototype, k, Object.getOwnPropertyDescriptor(M.prototype, k))
     }
   }
+  window.EchoSystemsMethodCount = seenMethods.size
 
   /* 从快照恢复运行（重建该层） */
   Game.prototype.restoreFrom = function (s) {

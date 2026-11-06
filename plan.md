@@ -202,6 +202,22 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 > 这是修正既有缺陷，不是平衡调整；`combat.test.cjs` 已把该行为固化为回归。
 > 复查中另列出的中优先级项（debugJumpFloor 与 nextFloor 的 rng 不一致、prefetch 超时状态不一致、mixin 同名静默覆盖）本轮**未动**，避免范围膨胀。
 
+## 2026-11-06 第六轮：把上一轮「未动项」按判断收口
+
+> 触发：用户圈出「真实 HP 平衡性 / 三个中优先级 / 口径」三段，授权「按你的想法改进」。
+> 判断：**不拍脑袋调数值**——先做可重复实测，再处理确证的逻辑问题；口径红线（不写「达标」）保持。
+
+| 项 | 判断 | 处置 |
+| --- | --- | --- |
+| 真实 HP 平衡性 | 需要数据，但机器人策略不足以代表真人 | `sim.test.cjs --real-hp` 观测模式（默认行为零变化）+ `npm run test:survival`。3 种子死亡楼层 `[3, 2, 2]`、均值 2.3，但 **3/3 死亡前 >5000 回合**（内层 guard 8000），属卡关持续挨打。**不构成真人难度证据 → 不调任何平衡数值**，工具输出自带警示 |
+| prefetch 超时状态不一致 | ✅ 确证逻辑 bug | 抽 `disableWorker()` 统一 terminate + 清引用 + settleAll；`ensureWorker()` 在 broken 时返回 null；`post()` 显式拒绝；超时与 onerror 共用收口。`generate(seed,floor,{timeoutMs})` 供测试注入短超时，dom-stub 用假 Worker + 桩计时器同步触发超时，5 条断言 |
+| mixin 同名静默覆盖 | ✅ 确证风险 | `systems.js` 合并时检测冲突并 **throw 快速失败**，导出 `EchoSystemsMethodCount`；dom-stub 断言方法名唯一 |
+| debugJumpFloor 与 nextFloor 的 rng 差异 | 🔄 **推翻第五轮判断**：不是 bug | 调试跳层本就无法复现「从 F1 爬上来」的 rng 消耗历史，按目标层派生种子反而是最可复现的选择。改为**显式标注**：调试叠层加 `rng=per-floor seed (jump != climb)`、README 说明、dom-stub 3 条断言把差异锁为设计行为 |
+
+> 口径：仍为「代码检测 + 真浏览器实测通过」，**不写作「达标」**（红线）。
+> 真实 HP 平衡性依旧需要人工试玩；这是唯一剩下的开放项，但已有定量基线支撑，不再是「未验证」。
+> 项数：dom-stub 39/51/51 → 48/60/60（+9：mixin 1 + prefetch 5 + rng 3）。
+
 ## 变更记录
 
 | 日期       | 内容                          |
@@ -246,3 +262,8 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | 🧪 sim.test 改走 bonus.maxHp 正规通道(原 9999 HP 是假),三种子回合数逐位不变 |
 | 2026-11-06 | 💾 存档随机流可复现:mulberry32 暴露状态,snapshot 增可选 rng 字段,v:1 不变、旧存档兼容 |
 | 2026-11-06 | 📊 项数:static 73→76、dom-stub 36/48/48→39/51/51、smoke 26→28、新增 combat 20 项 |
+| 2026-11-06 | 📈 新增 `npm run test:survival` 真实 HP 观测模式(默认 sim 行为不变),3 种子基线 [3,2,2] 均值 2.3 |
+| 2026-11-06 | ⚠ 基线自带卡关警示(3/3 >5000 回合),**不据此调平衡数值**,真人难度仍需试玩 |
+| 2026-11-06 | 🐛 修 prefetch 超时状态不一致:抽 disableWorker 统一收口,dom-stub 假 Worker 5 条断言 |
+| 2026-11-06 | 🛡 mixin 合并加同名方法冲突快速失败;调试叠层明示 rng 跳层差异(推翻上一轮「bug」判断) |
+| 2026-11-06 | 📊 项数:dom-stub 39/51/51→48/60/60;全套回归与 lint 0-0 全绿 |

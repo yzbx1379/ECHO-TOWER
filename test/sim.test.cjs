@@ -6,6 +6,9 @@
  */
 'use strict'
 const path = require('path')
+/* --real-hp：观测模式，不注入巨大 HP，用真实 6~8 血跑机器人，输出死亡楼层分布。
+ * 默认（不带参数）仍是「端到端逻辑回归」，行为完全不变。 */
+const REAL_HP = process.argv.includes('--real-hp')
 
 // ---- 浏览器环境垫片 ----
 global.window = global
@@ -169,6 +172,7 @@ function firstActionToward(g, sx, sy, isGoal, viaPath) {
 /* ---------------- 主模拟 ---------------- */
 function simulate(seed, maxFloor) {
   const drafts = []
+  let deathFloor = null
   const game = window.EchoGame.create({
     seed,
     floor: 1,
@@ -192,17 +196,24 @@ function simulate(seed, maxFloor) {
       },
       openShop: () => {},
       onGameOver: (s) => {
+        if (REAL_HP) {
+          deathFloor = s.floor
+          return
+        }
         throw new Error('模拟中死亡于第 ' + s.floor + ' 层')
       },
       onVictory: () => {},
     },
   })
-  // 测试作弊：巨大生命值（专注验证逻辑链路而非平衡）。
+  // 默认模式测试作弊：巨大生命值（专注验证逻辑链路而非平衡）。
   // 必须走 bonus.maxHp 正规通道：直接写 player.maxHp/hp 会被 damagePlayer 末尾的
   // recalcStats() 夹回真实 maxHp，修复「玩家无法死亡」bug 后机器人会在 F3 倒地。
-  game.bonus.maxHp = 9990
-  game.recalcStats()
-  game.player.hp = game.player.maxHp
+  // --real-hp 观测模式不注入，保留真实 6~8 HP 用于难度基线。
+  if (!REAL_HP) {
+    game.bonus.maxHp = 9990
+    game.recalcStats()
+    game.player.hp = game.player.maxHp
+  }
   let totalTurns = 0
   const log = []
   const lastActs = []
@@ -394,9 +405,12 @@ function simulate(seed, maxFloor) {
       if (game.floor !== floorBefore) break // 已进入下一层，回到外层重新初始化
     }
     log.push(`F${game.floor}: 回合${totalTurns} 天赋${drafts.length}`)
-    if (game.over) throw new Error('模拟中死亡')
+    if (game.over) {
+      if (REAL_HP) break // 观测模式：死亡即收工，记录楼层
+      throw new Error('模拟中死亡')
+    }
   }
-  return { game, totalTurns, drafts, log, lastActs }
+  return { game, totalTurns, drafts, log, lastActs, deathFloor }
 }
 function landing2Goal(x, y, shard) {
   return x === shard.x && y === shard.y
@@ -466,11 +480,20 @@ function pickSafeShard(g, pend) {
 
 /* ---------------- 运行多种子 ---------------- */
 let failed = 0
+const results = []
 const ONLY = process.env.ECHO_SIM_SEED ? Number(process.env.ECHO_SIM_SEED) : null
 for (const seed of ONLY ? [ONLY] : [12345, 777, 20250101]) {
   try {
     const t0 = Date.now()
     const r = simulate(seed, 100) // 一路爬到 F100，含全部 10 个 BOSS 战
+    if (REAL_HP) {
+      const floor = r.deathFloor || r.game.floor
+      results.push({ seed, floor, turns: r.totalTurns, victory: r.game.victory, talents: r.drafts.length })
+      console.log(
+        `  seed=${seed}: ${r.game.victory ? '通关' : '死于 F' + floor} · ${r.totalTurns} 回合 · ${r.drafts.length} 次天赋 · ${Date.now() - t0}ms`,
+      )
+      continue
+    }
     if (!r.game.victory) {
       console.error(`✗ seed=${seed} 未通关：停在 F${r.game.floor}（${r.totalTurns} 回合）`)
       console.error(
@@ -500,6 +523,22 @@ for (const seed of ONLY ? [ONLY] : [12345, 777, 20250101]) {
     console.error(`✗ seed=${seed} 失败：${e.message}`)
     console.error(e.stack.split('\n').slice(0, 4).join('\n'))
   }
+}
+if (REAL_HP) {
+  const floors = results.map((r) => r.floor)
+  const avg = floors.length ? (floors.reduce((a, b) => a + b, 0) / floors.length).toFixed(1) : 'N/A'
+  console.log('-'.repeat(40))
+  console.log(
+    `真实 HP 生存基线：${results.length} 种子，死亡/终止楼层 [${floors.join(', ')}]，均值 ${avg}，通关 ${results.filter((r) => r.victory).length} 个`,
+  )
+  const stuck = results.filter((r) => r.turns > 5000).length
+  if (stuck) {
+    console.log(
+      `⚠ ${stuck}/${results.length} 个种子死亡前超过 5000 回合（内层 guard 上限 8000），疑似卡在同一层持续挨打，不宜外推为真人难度。`,
+    )
+  }
+  console.log('注：机器人不主动躲避 / 攻击 / 用技能 / 购物，仅作下限参考；据此调平衡数值不可靠。')
+  process.exit(0)
 }
 if (failed) process.exit(1)
 console.log('✓ 端到端模拟全部通过')

@@ -25,22 +25,32 @@
     stats.syncFallback++
     return G.generateFloor(seed, floor, {})
   }
-  function dropWaiter(k, fn) {
-    const cur = waiters.get(k)
-    if (!cur) return
-    const rest = cur.filter((f) => f !== fn)
-    if (rest.length) waiters.set(k, rest)
-    else waiters.delete(k)
-  }
   function settleAll(err) {
     if (err) stats.errors++
     for (const [, list] of waiters) for (const fn of list) fn(null)
     waiters.clear()
     inflight.clear()
   }
+  /* Worker 失效统一收口：终止实例、清空引用、所有等待者以同步兜底结算。
+   * 原先 onerror 走这套，但超时分支只置 broken=true 且 worker 仍非 null，
+   * 导致 ensureWorker() 在 broken 时仍返回它、post() 继续往卡住的 Worker 发消息。 */
+  function disableWorker(countError) {
+    broken = true
+    if (worker) {
+      try {
+        worker.terminate()
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    worker = null
+    settleAll(countError)
+  }
 
+  const TIMEOUT_MS = 3000
   function ensureWorker() {
-    if (worker || broken) return worker
+    if (broken) return null
+    if (worker) return worker
     try {
       // file:// 下同源策略不允许加载 Worker，直接标为不可用，避免一次注定失败的
       // 加载与控制台报错；也让 enabled() 立即为 false，开局保持完全同步。
@@ -64,26 +74,15 @@
           for (const fn of list) fn(d.ok ? d.level : null)
         }
       }
-      worker.onerror = () => {
-        // Worker 脚本加载失败（典型是 file:// 的 origin 限制）→ 永久回落同步
-        broken = true
-        try {
-          worker.terminate()
-        } catch (e) {
-          /* ignore */
-        }
-        worker = null
-        settleAll(true)
-      }
+      worker.onerror = () => disableWorker(true)
     } catch (e) {
-      broken = true
-      worker = null
-      settleAll(true)
+      disableWorker(true)
     }
     return worker
   }
 
   function post(seed, floor) {
+    if (broken) return false
     const w = ensureWorker()
     if (!w) return false
     const k = key(seed, floor)
@@ -116,7 +115,7 @@
   }
 
   /* 首层：返回 Promise<level>。Worker 不可用时立即以同步结果 resolve。 */
-  function generate(seed, floor) {
+  function generate(seed, floor, opts) {
     const hit = take(seed, floor)
     if (hit) return Promise.resolve(hit)
     if (!ensureWorker()) return Promise.resolve(syncGen(seed, floor))
@@ -137,12 +136,9 @@
       const list = waiters.get(k) || []
       list.push(finish)
       waiters.set(k, list)
-      // Worker 卡住 3s → 同步兜底，绝不把开局卡死
-      timer = setTimeout(() => {
-        dropWaiter(k, finish)
-        broken = true
-        finish(null)
-      }, 3000)
+      // Worker 卡住 → 统一失效 + 同步兜底，绝不把开局卡死。
+      // opts.timeoutMs 仅供测试注入短超时，生产默认 3000ms。
+      timer = setTimeout(() => disableWorker(true), (opts && opts.timeoutMs) || TIMEOUT_MS)
       if (!post(seed, floor)) finish(null)
     })
   }

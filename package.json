@@ -8,6 +8,7 @@
     "test": "node test/gen.test.cjs && node test/sim.test.cjs && node test/combat.test.cjs && node test/dom-stub.cjs && node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug && node test/static.test.cjs",
     "test:gen": "node test/gen.test.cjs",
     "test:sim": "node test/sim.test.cjs",
+    "test:survival": "node test/sim.test.cjs --real-hp",
     "test:combat": "node test/combat.test.cjs",
     "test:ui": "node test/dom-stub.cjs",
     "test:debug": "node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug",

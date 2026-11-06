@@ -984,6 +984,9 @@
       `rec=${game.recording.length}  prev=${game.lastRecording.length}  echo=${echoOn ? 'ON' : 'OFF'}`,
       `shards=${got}/${L.shards.length}  exitLock=${!!L.exitLock}  hp=${p.hp}/${p.maxHp}`,
       `invuln=${game.debugInvuln ? 'ON' : 'OFF'}   [ ] floor   I invuln`,
+      // 调试跳层用「该层派生种子」，与从 F1 连续爬上来的 rng 连续流不同：
+      // 明示差异，避免把调试层当成真实层的战斗随机复现。
+      `rng=per-floor seed  (jump != climb)`,
     ]
     ctx.save()
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
