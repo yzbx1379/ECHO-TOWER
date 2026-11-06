@@ -20,7 +20,7 @@ jobs:
       - run: npm test
 
   lint:
-    name: ESLint (0 error 门槛)
+    name: ESLint + Prettier (格式门禁)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +30,7 @@ jobs:
           cache: npm
       - run: npm install --ignore-scripts
       - run: npm run lint
+      - run: npm run format:check
 
   smoke:
     name: 浏览器冒烟 (PWA/SW/渲染)

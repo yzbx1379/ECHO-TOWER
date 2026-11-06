@@ -69,16 +69,23 @@ js/data.js              数据表（群系/敌人/BOSS/遗物/天赋/职业/护�
 js/gen.js               地牢生成器（Dijkstra + Held-Karp 步数保证 + 推动语义软锁防护）
 js/core.js              引擎基建（输入/相机/粒子/hitstop）
 js/entities.js          敌人与 BOSS AI
-js/systems.js           回合结算/战斗/回声/成长/商店/楼层流程
+js/systems.js           Game 核心：构造 / 属性聚合 / 格子与实体查询（合并下列 mixin）
+js/systems.move.js      玩家行动 / 移动语义 / 机关触发（mixin）
+js/systems.combat.js    攻击 / 回合管线 / 技能 / 战斗与伤害结算（mixin）
+js/systems.hazards.js   投射物 / 激光 / 爆炸 / BOSS 支援效果（mixin）
+js/systems.echo.js      回声重演 / 拾取 / 宝箱 / 碎片（mixin）
+js/systems.progress.js  楼层流程 / 成长 / 商店 / 存档（mixin）
 js/render.js            Canvas 世界渲染 + 小地图 + 调试叠层 + 组号标记
 js/audio.js             WebAudio 合成音效与环境音乐
+js/prefetch.js          楼层预生成调度（Worker 缓存 + 同步 fallback）
+js/gen.worker.js        地牢生成 Worker（由 new Worker 加载，非 <script>）
 js/main.js              标题流程/输入泵/主循环/存档/调试开关
 sw.js                   Service Worker 预缓存清单（stale-while-revalidate）
 manifest.webmanifest    PWA 安装清单
 test/gen.test.cjs       生成器自动化测试（5 种子 × 100 层）
 test/sim.test.cjs       端到端逻辑模拟（3 种子通关 F100 → F101）
 test/dom-stub.cjs       DOM 桩冒烟（常规 / --debug / --url-debug 三种模式）
-test/static.test.cjs    index.html ↔ sw.js 缓存清单一致性
+test/static.test.cjs    index.html ↔ sw.js 缓存清单一致性（含 Worker 白名单）
 test/smoke.cjs          Playwright 浏览器截图冒烟（需本机执行权限）
 test/fetch-browser.cjs  浏览器下载辅助脚本
 DESIGN.md               完整设计文档
@@ -90,19 +97,20 @@ plan.md                 优化执行计划与变更记录
 ```bash
 npm test                 # 一键跑完全部 Node 测试（见下）
 npm run lint             # ESLint，0 error 门槛，已纳入 CI
+npm run format:check     # Prettier 全量格式门禁，已纳入 CI
 
 node test/gen.test.cjs            # 12,950 项断言：可解性 + 每层≥50步（约 2.8ms/层）
 node test/sim.test.cjs            # 端到端：3 种子真实爬塔通关 F100 → F101
 node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘制分支
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
-node test/static.test.cjs         # 53 项：index.html 引用 ↔ sw.js 预缓存清单双向比对
+node test/static.test.cjs         # 73 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单）
 node test/smoke.cjs               # 真浏览器截图（沙箱内被拦截时请在终端手动运行）
 ```
 
 `npm test` 依次执行 `gen` → `sim` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败。
 
-> 质检口径：以上为**代码检测结果**；另在 Chromium headless（1280×800）跑 `npm run smoke:browser`，**11/11 通过、控制台零错误**，并留存 `?debug=1` 真浏览器截图——调试叠层 5 行信息完整无遮挡，门/压力板组号徽记可见。灰度模式、不同分辨率与触屏仍建议自行复检，不记作「达标」。
+> 质检口径：以上为**代码检测结果**；另在 Chromium headless（1280×800）跑 `npm run smoke:browser`，**14/14 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底三条实测；并留存 `?debug=1` 真浏览器截图，调试叠层 5 行完整无遮挡、门/压力板组号徽记可见。灰度模式、不同分辨率与触屏仍建议自行复检，不记作「达标」。
 
 ## 🐞 调试模式
 
@@ -126,15 +134,16 @@ node test/smoke.cjs               # 真浏览器截图（沙箱内被拦截时�
 - 无任何外部运行时依赖；字体为可选在线加载，离线自动降级。
 - 音频全部由 WebAudio 实时合成；图形全部由 Canvas 程序化绘制。
 - 存档位于 localStorage：`echoTower.run`（当前局）/ `echoTower.meta`（元进度）/ `echoTower.debug`（可选调试开关）。
-- `npm run lint` 是 CI 门禁（0 error，当前 27 条存量 warning）；`npm run format:check` **不是门禁**：全项目 16 个文件仍不符合 Prettier 风格，全量 `--write` 会产生数千行重排 diff，本轮决定不做，`format`/`format:check` 仅作本地可选工具。
+- 代码风格已用 `prettier --write` **全量统一**（23 个文件、+6491/−4016 行纯格式改动，单独提交以便 review）；`npm run lint` 与 `npm run format:check` **均为 CI 门禁**，lint 当前 0 error / 27 条存量 warning。
+- 楼层预生成：`js/gen.worker.js` 在 Worker 中跑 Dijkstra + Held-Karp，`js/prefetch.js` 负责首层异步生成与下一层预取；`nextFloor()` 保持同步语义，命中缓存即零阻塞。`file://` 双击、DOM 桩、Worker 加载失败一律走同步 fallback，双击 `index.html` 仍可玩。`sim.test.cjs` 不加载该模块，端到端模拟确定性不受影响。
 - `package-lock.json` 原为陈旧文件（`"name": "geom"` 且无 devDependencies），2026-10-24 随 `npm install` 重建为 `echo-tower` 并补全 3 个 devDependencies，使 `npm ci` 可用；仅安装期依赖，不进入运行时。
-- CI（`.github/workflows/ci.yml`）三个并行 job：Node 测试、ESLint、Playwright 浏览器冒烟。
+- CI（`.github/workflows/ci.yml`）三个并行 job：Node 测试、ESLint + Prettier（lint + format:check）、Playwright 浏览器冒烟。
 
 ## 📄 许可与来源
 
 - 运行时零第三方依赖；图形全部由 Canvas 程序化绘制、音效全部由 WebAudio 合成，未包含外部美术/音频素材。在线字体为可选加载，离线自动降级。
 - 本项目采用 **MIT License**。按仓库约定，许可全文与来源声明合并进本节，**不单独放 `LICENSE.md`**；`package.json` 的 `license` 字段同步为 `MIT`。
-- Copyright 年份取自本仓库最早提交（2026），持有人取自 git 提交身份 `叶子不小 <yzbx1379@qq.com>`；如需改用其它署名，直接修改下方许可文本与 `package.json` 即可。
+- Copyright 年份取自本仓库最早提交（2026），持有人取自 Git 提交身份 `叶子不小 (yzbx1379)`；如需改用其它署名，直接修改下方许可文本与 `package.json` 即可。
 
 ### MIT License
 

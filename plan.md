@@ -15,13 +15,14 @@ npm test                          # 一键跑下面全部 Node 测试
 #  = node test/dom-stub.cjs             UI 冒烟 + 调试关闭 + 色盲组号分支
 #  = node test/dom-stub.cjs --debug      调试模式(localStorage 通路)
 #  = node test/dom-stub.cjs --url-debug  调试模式(URL ?debug=1 通路)
-#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(53 项)
+#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(73 项，含 Worker 白名单)
 npm run lint                      # ESLint(0 error 门槛，已纳入 CI)
-node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本机执行权限)
+npm run format:check              # Prettier 全量格式门禁(已纳入 CI)
+node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本机执行权限)
 ```
 
 回归标准:`gen.test.cjs` / `sim.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` 0 error;`smoke.cjs` 不得在沙箱外崩。
-> `format:check` **不作为门禁**:全项目 16 个文件仍不符合 Prettier 风格,全量 `--write` 会产生数千行重排 diff,本轮决定降级为可选工具(详见任务 9)。
+> `format:check` **已是 CI 门禁**(2026-11-06 全量重排后):23 个文件已用 `prettier --write` 统一风格,与 `npm run lint` 同在 CI 的 lint job;降级为可选工具是 2026-10-24 的中间结论,已被推翻(详见任务 9 的状态再更正)。
 
 ---
 
@@ -36,13 +37,13 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
 | 5   | i18n `tr()` 辅助函数(去重三元)    | 🥈     | ✅   | 中   |
 | 6   | PWA(manifest + service worker)     | 🥇     | ✅   | 中   |
 | 7   | 静态地形离屏 Canvas 缓存            | 🥈     | ✅   | 中   |
-| 8   | 首层生成 Web Worker                | 🥈     | ⏸️   | 中   |
-| 9   | ESLint + Prettier 工程化           | 🥈     | ✅ ESLint / ⏸️ Prettier | 低   |
+| 8   | 首层生成 Web Worker                | 🥈     | ✅   | 中   |
+| 9   | ESLint + Prettier 工程化           | 🥈     | ✅   | 低   |
 | 10  | 生成器 `dSpawn` 复用(小优化)       | 🥉     | ✅   | 低   |
 | 11  | 游戏内调试模式(?debug=1)          | 🥉     | ✅   | 低   |
 | 12  | 色盲友好(形状区分)                | 🥉     | ✅   | 中   |
-| 13  | heldKarp 改 TypedArray(可选)       | 🥉     | ⏳   | 低   |
-| 14  | systems.js 拆分(可选)             | 🥉     | ⏳   | 中   |
+| 13  | heldKarp 改 TypedArray(可选)       | 🥉     | ✅   | 低   |
+| 14  | systems.js 拆分(可选)             | 🥉     | ✅   | 中   |
 
 > 顺序考量:先做零风险纯增量(1-4)→ 可维护性重构(5)→ 综合性 PWA(6,需 1 的 favicon)→ 性能(7-8)→ 工程化(9)→ 收尾(10-14 视情况)。
 
@@ -118,7 +119,7 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
   - `js/main.js`:`startRun`/`nextFloor` 改异步:显示 loading → postMessage → onmessage 拿 level 交给 `EchoGame` 装配
   - 保留主线程 fallback:Worker 不可用时同步生成(确保 file:// 双击仍可玩)
 - **验收**:`sim.test.cjs` 逻辑不受影响(它直接 require gen);`smoke.cjs` 真浏览器首层加载无长卡顿;file:// 打开仍可玩。
-- **状态**:⏸️ 推迟(2026-08-23,用户确认)。依据 gen.test 实测:平均 **6ms/层**、峰值 **94ms/层**——换层卡顿轻微(约 5-6 帧),Worker 改造需重构 Game 构造 + 保留同步 fallback(file:// 双击要能玩)+ 测试双路径,维护成本高于收益。若后续实测移动端卡顿明显再重启。
+- **状态**:✅ 完成(2026-11-06,用户拍板推翻 2026-08-23 的推迟结论)。新增 `js/gen.worker.js`(只 `importScripts('data.js','gen.js')`,二者 UMD 以 self 为 root)+ `js/prefetch.js`(缓存/waiters/inflight/超时兜底)。首层 `startRun` 在 Worker 可用时异步生成并 `create({level})` 传入;`enterPlay` 后预取下一层,`buildLevel` 用 `EchoPrefetch.take()` 命中缓存,**`nextFloor()` 保持同步语义**,sim.test 不加载该模块、回合数完全不变。`file://` / DOM 桩 / Worker 失败 → `enabled()` 为 false → 完全同步开局(不引入微任务),双击 `index.html` 仍可玩。`static.test.cjs` 加 `CACHE_ONLY` 白名单,允许 Worker 脚本只进 ASSETS 不被 index.html 引用。实测:smoke 14/14(Worker 生成层与同步生成逐字段一致、`workerGenerated=1`);http 下 F1 预取 F2 → `]` 跳层后 cached 1→0、cacheHits+1、workerGenerated=2;`file://` 下 Worker 禁用、syncFallback=1、HUD 正常显示 F1,两条路径均零控制台错误。
 
 ### 9. ESLint + Prettier 工程化
 - **目标**:统一代码风格 + PR 质量门槛。
@@ -130,6 +131,7 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
 - **验收**:`npm run lint` 无 error;`npm run format --check` 通过(或先 `format` 一次统一)。
 - **状态**:✅ 配置完成(2026-08-23)。新增 `.eslintrc.cjs`(8 条宽松规则:no-undef error、no-unused-vars/no-fallthrough/eqeqeq warn;test/*.cjs 用 node env;忽略 .pw-browsers/shot_*.png)、`.prettierrc`(printWidth 120/semi false/singleQuote/trailingComma all,贴近现有风格)、`.prettierignore`;package.json 加 `lint`/`lint:fix`/`format`/`format:check` scripts + eslint/prettier devDeps。配置语法已验证(8 rules 解析正常)。**lint/format 实际运行待用户本地 `npm install`**(npm 在此沙箱被执行策略禁用)。CI workflow 已加(`.github/workflows/ci.yml`:push/PR 到 main 触发,两个并行 job——Node 测试 + Playwright 浏览器冒烟;lint 未纳入 CI 因配置尚未验证通过,待本地跑通后再加)。
 - **状态更正(2026-10-24 实跑)**:原"配置语法已验证"结论不成立——ESLint 首次实跑即报 `no-empty` 规则 schema 非法(`allowStatementCursors` 非合法字段),已改为 `allowEmptyCatch`;`test/**/*.cjs` override 误设 `browser:false` 导致 window/document 误报,已改回 `browser:true`。修完后 `npx eslint js/ test/` = **0 error / 27 warning**(warning 全为存量 unused-vars 与 ui.js 的 `close` 前置引用)。`.github/workflows/ci.yml` 新增第三个并行 `lint` job(`npm run lint` 作 0-error 门禁)。**Prettier 如实降级**:`prettier --check "js/**/*.js" "test/**/*.cjs"` 报 16 个文件不符合,全量 `--write` 会产生数千行重排 diff 且可能引发冲突,决定不执行;`format`/`format:check` 保留为本地可选命令,**不纳入 CI、不作为合并门禁**。
+- **状态再更正(2026-11-06,用户拍板全量重排)**:已执行 `prettier --write "js/**/*.js" "test/**/*.cjs"`,**23 个文件**统一格式(+6491/−4016,纯格式改动单独提交以便 review);`format:check` 现通过并升级为 **CI 门禁**(与 `npm run lint` 同在 lint job)。重排前先做本地中间提交 `e112d9c` 作回滚基线;重排后全套回归再次全绿(gen 12950、sim 三种子通关 F101 且回合数不变、dom-stub 36/48/48、static 73/73、lint 0 error、format:check 通过、smoke 14/14)。
 
 ### 10. 生成器 `dSpawn` 复用
 - **目标**:消除 `buildOnce` 40 次试探里对 `spawn` 重复的 stateBFS。
@@ -151,11 +153,11 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
 
 ### 13. heldKarp 改 TypedArray(可选)
 - **目标**:学术优化,Map→Float64Array。K≤7 收益极小。
-- **状态**:⏳(视 10 完成后是否值得)
+- **状态**:✅ 完成(2026-11-06)。`gen.js` 的 `heldKarp` 由 `Map<number,number>` 改为 `Float64Array` + `Infinity` 哨兵,`STRIDE = K+1` 不再依赖硬编码 16。独立等价性脚本跑 **8000 组随机矩阵**(K=0..7、含 4% 不可达边),新旧实现**逐例完全一致**;`gen.test` 12950/12950、OPT 下限 52 不变。K≤7 绝对收益极小,主要价值是去掉哈希装箱与每次试探的 Map 分配。
 
 ### 14. systems.js 拆分(可选)
 - **目标**:52KB 单文件拆 4-5 个。仅在后续大改时做。
-- **状态**:⏳
+- **状态**:✅ 完成(2026-11-06)。`systems.js` 1326 行按注释分节拆成 `systems.move/combat/hazards/echo/progress.js` 五个 **mixin class**(方法体逐行搬运,不用给 class 方法补逗号),各文件在 `systems.js` 之前加载并 push 到 `window.EchoSystemsParts`;`systems.js` 末尾用 `Object.getOwnPropertyDescriptor` 把方法合并进 `Game.prototype`。核心文件只留构造/属性聚合/查询(243 行),**方法数 80→80 无丢失**;拆出的 mixin 只声明实际用到的全局依赖,lint warning 未增加。**等价性证据**:sim 三种子通关回合数 15886/16938/15348 与拆分前逐位一致,dom-stub 36/48/48、static 73/73 全绿。原文件已可逆归档后再重写。
 
 ---
 
@@ -177,7 +179,9 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
 | 🟡 `gen.js` 兜底分支 `w/h` 未定义 | 极端情况会抛 `ReferenceError` | ESLint `no-undef` 提前抓到,改为独立重算 `safeW`/`safeH` |
 | 🟡 `package-lock.json` 陈旧 | 原文件 `"name": "geom"` 且无 devDependencies,与本仓库无关 | `npm install` 重建为 `echo-tower` + 3 个 devDeps(103 包);详见 README 工程说明 |
 
-> 口径备注(2026-11-06 更新):本机补装 Playwright `chromium_headless_shell-1234`(114.5 MiB)后,`node test/smoke.cjs` 已跑通 **11/11、控制台零错误**;顺带修复 SW 断言日志——原写法 `page.evaluate(() => getRegistration())` 跨进程序列化丢失原型属性,日志恒显示 `undefined`,改为直接回传 `r.scope`,现在输出 `http://localhost:8765/` 可核验。**灰度滤镜 / 多分辨率 / 触屏仍未实测**,整体记作"代码检测 + 常规配色真浏览器目视通过,灰度待人工复检",不写作"达标"。
+> 口径备注(2026-11-06 更新):本机补装 Playwright `chromium_headless_shell-1234`(114.5 MiB)后,`node test/smoke.cjs` 已跑通 **11/11**(当时口径;第二轮已扩至 14/14)、控制台零错误;顺带修复 SW 断言日志——原写法 `page.evaluate(() => getRegistration())` 跨进程序列化丢失原型属性,日志恒显示 `undefined`,改为直接回传 `r.scope`,现在输出 `http://localhost:8765/` 可核验。**灰度滤镜 / 多分辨率 / 触屏仍未实测**,整体记作"代码检测 + 常规配色真浏览器目视通过,灰度待人工复检",不写作"达标"。
+>
+> 补充(2026-11-06 第二轮):`node test/smoke.cjs` 扩到 **14/14**,新增「Worker 生成层与主线程同步生成逐字段一致」「Worker 路径已启用」两条断言;一次性脚本另实测 http 换层预取命中(F1 预取 F2 → 跳层后 cached 1→0、cacheHits+1)与 `file://` 双击兜底(Worker 禁用、syncFallback=1、HUD F1 正常)。**全量 Prettier 重排**完成(23 文件)并纳入 CI 门禁。
 
 ---
 
@@ -208,3 +212,8 @@ node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本�
 | 2026-11-05 | ✅ 任务 12:门/压力板组号标记(色盲友好),收敛范围为真实缺口 |
 | 2026-11-05 | 📝 README/plan 同步、package-lock 规范化、全量回归(gen 12950 + sim 3 种子 + dom-stub 36/48/48 + static 53 + lint 0 error) |
 | 2026-11-06 | 🧪 补装 Playwright headless shell,真浏览器冒烟 11/11 + 控制台零错误;修 SW 断言日志(回传 `r.scope`);`?debug=1` 跳层/无敌与组号徽记截图目视通过 |
+| 2026-11-06 | ✅ 任务13:heldKarp 改 Float64Array,8000 组随机矩阵与旧 Map 版逐例等价 |
+| 2026-11-06 | ✅ 任务14:systems.js 1326 行拆 5 个 mixin,方法数 80→80,sim 回合数不变 |
+| 2026-11-06 | ✅ 任务8:首层 Web Worker + 换层预取;`file://` 同步兜底实测通过,smoke 扩至 14/14 |
+| 2026-11-06 | 📄 MIT 许可并入 README 独立章节(不建 LICENSE.md),package.json/lock 同步 |
+| 2026-11-06 | 🎨 Prettier 全量重排 23 文件(+6491/−4016,单独提交),format:check 升级为 CI 门禁 |
