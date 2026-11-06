@@ -49,6 +49,24 @@
     return String(g + 1)
   }
 
+  /* 小字号可读性下限：门上方 ⚡N/M 与压力板下方 ⚡N 共用。
+   * 390 宽手机实测：原先 9~10px、无衬底直接压在地图底砖/呼吸光环上，
+   * 组色字与深绿底对比不足；统一 11px + 深色衬底，文字也不再随 pulse 变淡。
+   * 导出 SMALL_FONT_PX 给 smoke.cjs 断言，防止被改回小字号。 */
+  const SMALL_FONT_PX = 11
+  function smallLabel(ctx, text, cx, baselineY, color) {
+    ctx.save()
+    ctx.font = `bold ${SMALL_FONT_PX}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    const w = ctx.measureText(text).width
+    ctx.fillStyle = 'rgba(0,0,0,.82)'
+    ctx.fillRect(cx - w / 2 - 3, baselineY - SMALL_FONT_PX - 1, w + 6, SMALL_FONT_PX + 3)
+    ctx.fillStyle = color
+    ctx.fillText(text, cx, baselineY)
+    ctx.restore()
+  }
+
   /* ---------------- 主渲染 ---------------- */
   function render(ctx, game, canvas, time) {
     const dpr = canvas.__dpr || 1
@@ -357,11 +375,10 @@
           ctx.strokeStyle = gc
           ctx.lineWidth = 2.5
           ctx.strokeRect(px + 3, py + 2, TS - 6, TS - 4)
-          ctx.fillStyle = gc
-          ctx.font = 'bold 10px sans-serif'
-          ctx.textAlign = 'center'
-          ctx.fillText('⚡' + String((g && g.charge) || 0) + '/' + String((g && g.need) || '?'), px + TS / 2, py - 2)
           ctx.restore()
+          // 充能进度移到 pulse 之外：原先会随呼吸周期性变淡，且无衬底直接压在上一格地砖上
+          const chargeTxt = '⚡' + String((g && g.charge) || 0) + '/' + String((g && g.need) || '?')
+          smallLabel(ctx, chargeTxt, px + TS / 2, py - 3, gc)
           // 组号徽记：与同组压力板数字一致，灰度下仍可配对
           ctx.save()
           ctx.fillStyle = 'rgba(0,0,0,.78)'
@@ -396,10 +413,8 @@
         ctx.textBaseline = 'middle'
         ctx.fillText(groupMark(pl ? pl.group : 0), px + TS / 2, py + TS / 2 + 0.5)
         if (!done && linked) {
-          ctx.fillStyle = gc
-          ctx.font = 'bold 9px sans-serif'
-          ctx.textAlign = 'center'
-          ctx.fillText('⚡' + (linked.need - Math.min(linked.charge || 0, linked.need)), px + TS / 2, py + TS - 1)
+          const needTxt = '⚡' + (linked.need - Math.min(linked.charge || 0, linked.need))
+          smallLabel(ctx, needTxt, px + TS / 2, py + TS - 2, gc)
         }
         ctx.restore()
         break
@@ -993,5 +1008,5 @@
     ctx.restore()
   }
 
-  window.EchoRender = { render, drawMinimap, drawDebugOverlay, groupMark, TS }
+  window.EchoRender = { render, drawMinimap, drawDebugOverlay, groupMark, SMALL_FONT_PX, TS }
 })()

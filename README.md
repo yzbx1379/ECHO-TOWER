@@ -105,12 +105,12 @@ node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘�
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
 node test/static.test.cjs         # 73 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单）
-node test/smoke.cjs               # 真浏览器 24 项（PWA/Worker/灰度/三分辨率/触屏）
+node test/smoke.cjs               # 真浏览器 26 项（PWA/Worker/灰度/三分辨率/触屏/小字号）
 ```
 
 `npm test` 依次执行 `gen` → `sim` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败。
 
-> 质检口径：以上为**代码检测结果**；另在 Chromium headless 跑 `npm run smoke:browser`，**24/24 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底、灰度滤镜、三档分辨率、触屏虚拟按键七类实测；并留存 `?debug=1`、`grayscale(1)` 与门/板徽记专项截图。灰度下组号徽记局部亮度 `min=8 / max=245 / spread=237`，白字深底仍可辨；三分辨率横向溢出均为 0。仍建议你在真实设备上过一眼小字号元素，不记作「达标」。
+> 质检口径：以上为**代码检测结果**；另在 Chromium headless 跑 `npm run smoke:browser`，**26/26 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号八类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部亮度 `min=8 / max=245 / spread=237`，白字深底仍可辨；三分辨率横向溢出均为 0。**小字号复检已闭环**：390 宽放大图确认门上方 `⚡N/M`（原 10px）与压力板下方 `⚡N`（原 9px）无衬底、贴深绿地砖与呼吸光环不易辨；已统一 11px 并加深色衬底、移出 pulse 透明度，改后文字带 spread 188→201 / 180→191，`smoke.cjs` 第 26 项固化字号下限与衬底断言。仍不记作「达标」——真实设备的字体渲染差异不在自动化覆盖内。
 
 ## 🐞 调试模式
 

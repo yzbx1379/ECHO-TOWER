@@ -16,6 +16,7 @@
  *   8. 灰度滤镜（真实画面亮度层次 + 门/板组号徽记局部对比度，留截图）
  *   9. 多分辨率（390×844 / 768×1024 / 1920×1080）
  *  10. 触屏虚拟按键（方向 + 动作事件进入输入泵）
+ *  11. 390 宽小字号可读性（字号下限 + ⚡文字带深色衬底与对比度）
  * ========================================================================= */
 'use strict'
 const http = require('http')
@@ -368,6 +369,70 @@ const ok = (cond, msg) => {
     ok(
       fired.includes('right') && fired.includes('wait') && errs.length === 0,
       `触屏事件进入输入泵: [${fired.join(', ')}], 错误=${errs.length}`,
+    )
+    await c.close()
+  }
+
+  // ── 11. 390 宽小字号可读性（防回归）：⚡N/M 与 ⚡N 的字号下限 + 深色衬底
+  {
+    const c = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })
+    const p = await c.newPage()
+    await p.goto(`http://localhost:${PORT}/`)
+    await p.waitForSelector('.title-name', { timeout: 5000 })
+    const m = await p.evaluate(() => {
+      const T = window.EchoGen.T
+      const g = window.EchoGame.create({ seed: 4242, floor: 1, classId: 'knight' })
+      const L = g.level,
+        s = L.spawn
+      const cand = []
+      for (let y = s.y - 3; y <= s.y + 3; y++) {
+        for (let x = s.x - 3; x <= s.x + 3; x++) {
+          if (g.inBounds(x, y) && g.tileAt(x, y) === T.FLOOR && !(x === s.x && y === s.y)) cand.push([x, y])
+        }
+      }
+      if (cand.length < 2) return null
+      const a = cand[0],
+        b = cand[1]
+      L.grid[g.idx(a[0], a[1])] = T.GATE
+      L.gates.push({ x: a[0], y: a[1], group: 2, open: false, charge: 0, need: 2 })
+      L.grid[g.idx(b[0], b[1])] = T.PLATE
+      L.plates.push({ x: b[0], y: b[1], group: 2 })
+      g.player.px = g.player.x
+      g.player.py = g.player.y
+      const cv = document.createElement('canvas')
+      cv.width = 390
+      cv.height = 844
+      cv.__dpr = 1
+      const c2 = cv.getContext('2d')
+      window.EchoCore.camera.snap(s.x * 36, s.y * 36)
+      window.EchoRender.render(c2, g, cv, 0)
+      const camX = window.EchoCore.camera.x - 195,
+        camY = window.EchoCore.camera.y - 422
+      const bx = Math.max(0, Math.round(a[0] * 36 - camX)),
+        by = Math.max(0, Math.round(a[1] * 36 - camY))
+      const px = Math.max(0, Math.round(b[0] * 36 - camX)),
+        py = Math.max(0, Math.round(b[1] * 36 - camY))
+      const band = (x, y, w, h) => {
+        const d = c2.getImageData(x, y, w, h).data
+        let min = 255,
+          max = 0
+        for (let i = 0; i < d.length; i += 4) {
+          const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]
+          if (l < min) min = l
+          if (l > max) max = l
+        }
+        return { min: Math.round(min), spread: Math.round(max - min) }
+      }
+      return {
+        fontPx: window.EchoRender.SMALL_FONT_PX,
+        gateTop: band(bx, Math.max(0, by - 14), 36, 14),
+        plateBottom: band(px, py + 24, 36, 12),
+      }
+    })
+    ok(!!m && m.fontPx >= 11, `390 宽小字号下限: SMALL_FONT_PX=${m && m.fontPx}`)
+    ok(
+      !!m && m.gateTop.min <= 20 && m.gateTop.spread >= 190 && m.plateBottom.min <= 20 && m.plateBottom.spread >= 185,
+      `⚡文字带深色衬底与对比: 门 ${JSON.stringify(m && m.gateTop)} 板 ${JSON.stringify(m && m.plateBottom)}`,
     )
     await c.close()
   }
