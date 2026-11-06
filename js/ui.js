@@ -12,8 +12,7 @@
   const ds = (x) => LANG().tr(x, 'desc')
 
   let root = null,
-    hudEls = {},
-    toastTimer = null
+    hudEls = {}
 
   function el(tag, cls, html) {
     const e = document.createElement(tag)
@@ -171,6 +170,7 @@
   /* ---------------- 天赋三选一 ---------------- */
   function openDraft(choices, reason, onPick) {
     const box = el('div', 'draft-box')
+    const close = modal(box)
     box.appendChild(el('h3', null, LANG().t(reason || '选择一项天赋')))
     const row = el('div', 'draft-row')
     choices.forEach((t, i) => {
@@ -183,13 +183,13 @@
       row.appendChild(card)
     })
     box.appendChild(row)
-    const close = modal(box)
   }
 
   /* ---------------- 商店 ---------------- */
   function openShop(stock, game, onBuy, onClose) {
     const en = LANG().isEN()
     const box = el('div', 'shop-box')
+    const close = modal(box)
     const refresh = () => {
       box.innerHTML = `<h3>🏪 ${en ? 'Echo Shop' : '回声商店'} <span class="dim">（${en ? 'Gold' : '金币'} ◎${game.gold}）</span></h3>`
       const list = el('div', 'shop-list')
@@ -214,13 +214,13 @@
       box.appendChild(leave)
     }
     refresh()
-    const close = modal(box)
   }
 
   /* ---------------- 结算画面 ---------------- */
   function gameOver(sum, meta, onRetry, onTitle) {
     const en = LANG().isEN()
     const box = el('div', 'end-box')
+    const close = modal(box)
     box.appendChild(el('h2', 'dead-title', en ? 'The Tower kept you here' : '塔将你留在了这里'))
     box.appendChild(
       el(
@@ -254,11 +254,11 @@
     }
     row.append(again, home)
     box.appendChild(row)
-    const close = modal(box)
   }
   function victory(sum, onEndless, onTitle) {
     const en = LANG().isEN()
     const box = el('div', 'end-box win')
+    const close = modal(box)
     box.appendChild(el('h2', 'win-title', en ? '⟲ The First Echo falls silent' : '⟲ 初生回声归于寂静'))
     box.appendChild(
       el(
@@ -294,13 +294,13 @@
     }
     row.append(home)
     box.appendChild(row)
-    const close = modal(box)
   }
 
   /* ---------------- 暂停 / 帮助 ---------------- */
   function pauseMenu(game, opts) {
     const en = LANG().isEN()
     const box = el('div', 'pause-box')
+    const close = modal(box)
     box.appendChild(el('h3', null, en ? '⏸ Paused' : '⏸ 暂停'))
     const relicNames = game.relicIds.length
       ? game.relicIds
@@ -350,11 +350,11 @@
       'ghost',
     )
     box.appendChild(row)
-    const close = modal(box)
   }
   function help(onClose) {
     const en = LANG().isEN()
     const box = el('div', 'help-box')
+    const close = modal(box)
     if (en) {
       box.innerHTML = `
         <h3>❓ Climber's Guide</h3>
@@ -387,13 +387,13 @@
     const b = el('button', 'btn primary', en ? 'Got it' : '明白了')
     b.onclick = () => close()
     box.appendChild(b)
-    const close = modal(box)
   }
 
   /* ---------------- 存档导入/导出 ---------------- */
   function openSaveIO(opts) {
     const en = LANG().isEN()
     const box = el('div', 'saveio-box')
+    const close = modal(box)
     box.appendChild(el('h3', null, en ? '💾 Save Code' : '💾 存档码'))
     box.appendChild(
       el(
@@ -435,7 +435,6 @@
     }
     row.append(exp, imp, back)
     box.appendChild(row)
-    const close = modal(box)
   }
 
   window.EchoUI = {

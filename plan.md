@@ -21,7 +21,7 @@ npm run format:check              # Prettier 全量格式门禁(已纳入 CI)
 node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本机执行权限)
 ```
 
-回归标准:`gen.test.cjs` / `sim.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` 0 error;`smoke.cjs` 不得在沙箱外崩。
+回归标准:`gen.test.cjs` / `sim.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` **0 error / 0 warning**;`npm run format:check` 通过;`smoke.cjs` 24 项全过且零控制台错误。
 > `format:check` **已是 CI 门禁**(2026-11-06 全量重排后):23 个文件已用 `prettier --write` 统一风格,与 `npm run lint` 同在 CI 的 lint job;降级为可选工具是 2026-10-24 的中间结论,已被推翻(详见任务 9 的状态再更正)。
 
 ---
@@ -149,7 +149,7 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 - **目标**:不只靠色相区分碎片/出口/危险。
 - **改动**:`js/data.js` 群系调色补对比度;`render.js` 给关键实体加形状/图案(如出口加门框、碎片加菱形描边)。
 - **验收**:灰度模式下仍可辨识关键元素。
-- **状态**:✅ 完成(2026-11-05,按实际缺口收敛)。复查结论:碎片(菱形)、宝箱(横箱)、锁住的出口(圆+叉)、栅栏门(竖栏+⚡充能)、压力板(圆环)、箭头(三角)、传送门(圆)、相位墙(虚线框)、尖刺(锯齿) **本来就有形状区分**,不需要再堆图形。真正只依赖色相的是 **门 group ↔ 压力板 group 的配对**(4 种组色,无其它线索)。因此在两处叠加一致的组号数字徽记(`render.js` 新增并导出 `groupMark(group)` → 1–4,按 4 取模稳定),组色降为辅助线索;未改动其它渲染路径。`test/dom-stub.cjs` 断言 4 组号互异/为纯数字/取模稳定,并强制把 GATE/PLATE 注入某层后跑一次 `render()`,保证新增分支不抛错。**2026-11-06 补真浏览器截图**:同一张 F2 截图中可见两块压力板中心分别显示 `1`/`2`、右侧栅栏门左上角显示同组 `2` 徽记,数字与组色一一对应、无重叠。**灰度滤镜下的辨识度仍未单独实测**,按口径记为"代码检测 + 常规配色目视通过,灰度待人工复检",不写作"达标"。
+- **状态**:✅ 完成(2026-11-05,按实际缺口收敛)。复查结论:碎片(菱形)、宝箱(横箱)、锁住的出口(圆+叉)、栅栏门(竖栏+⚡充能)、压力板(圆环)、箭头(三角)、传送门(圆)、相位墙(虚线框)、尖刺(锯齿) **本来就有形状区分**,不需要再堆图形。真正只依赖色相的是 **门 group ↔ 压力板 group 的配对**(4 种组色,无其它线索)。因此在两处叠加一致的组号数字徽记(`render.js` 新增并导出 `groupMark(group)` → 1–4,按 4 取模稳定),组色降为辅助线索;未改动其它渲染路径。`test/dom-stub.cjs` 断言 4 组号互异/为纯数字/取模稳定,并强制把 GATE/PLATE 注入某层后跑一次 `render()`,保证新增分支不抛错。**2026-11-06 补真浏览器截图**:同一张 F2 截图中可见两块压力板中心分别显示 `1`/`2`、右侧栅栏门左上角显示同组 `2` 徽记,数字与组色一一对应、无重叠。**2026-11-06 第三轮灰度实测已闭环**:`smoke.cjs` 注入 `grayscale(1)` 后真实画面有效灰阶 9~11 档 / spread 197~237（随 seed 波动，自动化门槛 levels≥8 / spread≥100）;专项探针把一对 GATE/PLATE 放到出生点旁单独渲染,徽记区域灰度后 `min=8 max=245 spread=237`;`test/shot_grayscale_badge.png` 目视确认门左上角与压力板中心的 `1/2/3` 均清晰、无重叠。多分辨率(390×844 / 768×1024 / 1920×1080)横向溢出全为 0、HUD 可见、零错误;触屏 4 方向 + 3 动作键可见且 `[right, wait]` 确实进入输入泵。整体记作"代码检测 + 真浏览器多场景实测通过",仍建议真实设备过一眼小字号元素,不写作"达标"。
 
 ### 13. heldKarp 改 TypedArray(可选)
 - **目标**:学术优化,Map→Float64Array。K≤7 收益极小。
@@ -179,9 +179,10 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 🟡 `gen.js` 兜底分支 `w/h` 未定义 | 极端情况会抛 `ReferenceError` | ESLint `no-undef` 提前抓到,改为独立重算 `safeW`/`safeH` |
 | 🟡 `package-lock.json` 陈旧 | 原文件 `"name": "geom"` 且无 devDependencies,与本仓库无关 | `npm install` 重建为 `echo-tower` + 3 个 devDeps(103 包);详见 README 工程说明 |
 
-> 口径备注(2026-11-06 更新):本机补装 Playwright `chromium_headless_shell-1234`(114.5 MiB)后,`node test/smoke.cjs` 已跑通 **11/11**(当时口径;第二轮已扩至 14/14)、控制台零错误;顺带修复 SW 断言日志——原写法 `page.evaluate(() => getRegistration())` 跨进程序列化丢失原型属性,日志恒显示 `undefined`,改为直接回传 `r.scope`,现在输出 `http://localhost:8765/` 可核验。**灰度滤镜 / 多分辨率 / 触屏仍未实测**,整体记作"代码检测 + 常规配色真浏览器目视通过,灰度待人工复检",不写作"达标"。
+> 口径备注(2026-11-06 更新):本机补装 Playwright `chromium_headless_shell-1234`(114.5 MiB)后,`node test/smoke.cjs` 已跑通 **11/11**(当时口径;第二轮已扩至 14/14)、控制台零错误;顺带修复 SW 断言日志——原写法 `page.evaluate(() => getRegistration())` 跨进程序列化丢失原型属性,日志恒显示 `undefined`,改为直接回传 `r.scope`,现在输出 `http://localhost:8765/` 可核验。**灰度滤镜 / 多分辨率 / 触屏已于第三轮实测覆盖**(见下方补充),整体记作"代码检测 + 真浏览器多场景实测通过",不写作"达标"。
 >
 > 补充(2026-11-06 第二轮):`node test/smoke.cjs` 扩到 **14/14**,新增「Worker 生成层与主线程同步生成逐字段一致」「Worker 路径已启用」两条断言;一次性脚本另实测 http 换层预取命中(F1 预取 F2 → 跳层后 cached 1→0、cacheHits+1)与 `file://` 双击兜底(Worker 禁用、syncFallback=1、HUD F1 正常)。**全量 Prettier 重排**完成(23 文件)并纳入 CI 门禁。
+> 补充(2026-11-06 第三轮):`smoke.cjs` 扩到 **24/24**,新增灰度画面亮度层次(levels 9~11 / spread 197~237，随 seed 波动)、灰度侧组号仍为 `1234`、门/板徽记专项局部对比度(`min=8 max=245 spread=237`)与两张灰度截图、三档分辨率(HUD/画布/横向溢出/控制台)、触屏虚拟按键可见性与 `echo-vbtn` 事件链路;`test/shot_grayscale.png` 与 `test/shot_grayscale_badge.png` 目视复检通过(均为 gitignore 的临时产物)。**27 条存量 ESLint warning 已清零**,`npx eslint js/ test/` 现为 0 error / 0 warning。
 
 ---
 
@@ -217,3 +218,6 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | ✅ 任务8:首层 Web Worker + 换层预取;`file://` 同步兜底实测通过,smoke 扩至 14/14 |
 | 2026-11-06 | 📄 MIT 许可并入 README 独立章节(不建 LICENSE.md),package.json/lock 同步 |
 | 2026-11-06 | 🎨 Prettier 全量重排 23 文件(+6491/−4016,单独提交),format:check 升级为 CI 门禁 |
+| 2026-11-06 | 🧹 清理 27 条存量 ESLint warning(未用变量 / close 前置引用 / 桩声明提前 / 补 lastErr 诊断),lint 0 error 0 warning |
+| 2026-11-06 | 🧪 smoke 扩至 24/24:灰度滤镜 + 组号徽记专项探针 + 三分辨率 + 触屏链路实测,目视截图复检通过 |
+| 2026-11-06 | 📝 README/plan 口径同步:灰度 / 多分辨率 / 触屏由「未实测」改为实测结论 |

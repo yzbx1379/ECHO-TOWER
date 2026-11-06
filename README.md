@@ -96,7 +96,7 @@ plan.md                 优化执行计划与变更记录
 
 ```bash
 npm test                 # 一键跑完全部 Node 测试（见下）
-npm run lint             # ESLint，0 error 门槛，已纳入 CI
+npm run lint             # ESLint，0 error / 0 warning 门槛，已纳入 CI
 npm run format:check     # Prettier 全量格式门禁，已纳入 CI
 
 node test/gen.test.cjs            # 12,950 项断言：可解性 + 每层≥50步（约 2.8ms/层）
@@ -105,12 +105,12 @@ node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘�
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
 node test/static.test.cjs         # 73 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单）
-node test/smoke.cjs               # 真浏览器截图（沙箱内被拦截时请在终端手动运行）
+node test/smoke.cjs               # 真浏览器 24 项（PWA/Worker/灰度/三分辨率/触屏）
 ```
 
 `npm test` 依次执行 `gen` → `sim` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败。
 
-> 质检口径：以上为**代码检测结果**；另在 Chromium headless（1280×800）跑 `npm run smoke:browser`，**14/14 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底三条实测；并留存 `?debug=1` 真浏览器截图，调试叠层 5 行完整无遮挡、门/压力板组号徽记可见。灰度模式、不同分辨率与触屏仍建议自行复检，不记作「达标」。
+> 质检口径：以上为**代码检测结果**；另在 Chromium headless 跑 `npm run smoke:browser`，**24/24 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底、灰度滤镜、三档分辨率、触屏虚拟按键七类实测；并留存 `?debug=1`、`grayscale(1)` 与门/板徽记专项截图。灰度下组号徽记局部亮度 `min=8 / max=245 / spread=237`，白字深底仍可辨；三分辨率横向溢出均为 0。仍建议你在真实设备上过一眼小字号元素，不记作「达标」。
 
 ## 🐞 调试模式
 
@@ -127,14 +127,14 @@ node test/smoke.cjs               # 真浏览器截图（沙箱内被拦截时�
 
 ## ♿ 色盲友好
 
-碎片（菱形）、宝箱（横箱）、未解锁出口（圆+叉）、栅栏门（竖栏）、压力板（圆环）、箭头（三角）、传送门（圆）、相位墙（虚线框）、尖刺（锯齿）本就有形状区分。唯一曾只靠色相关联的是**栅栏门与压力板的分组**（4 种组色），现在两者叠加一致的 **1–4 组号数字徽记**，灰度下也能判断哪块板开哪扇门，组色退为辅助线索。
+碎片（菱形）、宝箱（横箱）、未解锁出口（圆+叉）、栅栏门（竖栏）、压力板（圆环）、箭头（三角）、传送门（圆）、相位墙（虚线框）、尖刺（锯齿）本就有形状区分。唯一曾只靠色相关联的是**栅栏门与压力板的分组**（4 种组色），现在两者叠加一致的 **1–4 组号数字徽记**，灰度下也能判断哪块板开哪扇门，组色退为辅助线索。**灰度实测**：注入 `grayscale(1)` 后真实画面有效灰阶 9~11 档、亮度 spread 197~237（随该局随机 seed 波动；自动化门槛 levels≥8 / spread≥100）；专项探针把一对门/板放到出生点旁单独渲染，徽记区域灰度后 `min=8 / max=245 / spread=237`，截图目视确认数字 `1/2/3` 清晰、无重叠遮挡。
 
 ## 🛠 开发说明
 
 - 无任何外部运行时依赖；字体为可选在线加载，离线自动降级。
 - 音频全部由 WebAudio 实时合成；图形全部由 Canvas 程序化绘制。
 - 存档位于 localStorage：`echoTower.run`（当前局）/ `echoTower.meta`（元进度）/ `echoTower.debug`（可选调试开关）。
-- 代码风格已用 `prettier --write` **全量统一**（23 个文件、+6491/−4016 行纯格式改动，单独提交以便 review）；`npm run lint` 与 `npm run format:check` **均为 CI 门禁**，lint 当前 0 error / 27 条存量 warning。
+- 代码风格已用 `prettier --write` **全量统一**（23 个文件、+6491/−4016 行纯格式改动，单独提交以便 review）；`npm run lint` 与 `npm run format:check` **均为 CI 门禁**。27 条存量 ESLint warning 已全部清理（未用变量删除/补齐真实用途、`ui.js` 的 `close` 定义提前、DOM 桩声明提前、`fetch-browser.cjs` 补上失败诊断输出），当前 **0 error / 0 warning**。
 - 楼层预生成：`js/gen.worker.js` 在 Worker 中跑 Dijkstra + Held-Karp，`js/prefetch.js` 负责首层异步生成与下一层预取；`nextFloor()` 保持同步语义，命中缓存即零阻塞。`file://` 双击、DOM 桩、Worker 加载失败一律走同步 fallback，双击 `index.html` 仍可玩。`sim.test.cjs` 不加载该模块，端到端模拟确定性不受影响。
 - `package-lock.json` 原为陈旧文件（`"name": "geom"` 且无 devDependencies），2026-10-24 随 `npm install` 重建为 `echo-tower` 并补全 3 个 devDependencies，使 `npm ci` 可用；仅安装期依赖，不进入运行时。
 - CI（`.github/workflows/ci.yml`）三个并行 job：Node 测试、ESLint + Prettier（lint + format:check）、Playwright 浏览器冒烟。

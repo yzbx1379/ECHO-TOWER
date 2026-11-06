@@ -37,7 +37,6 @@ require(path.join(__dirname, '..', 'js', 'systems.progress.js'))
 require(path.join(__dirname, '..', 'js', 'systems.js'))
 
 const G = window.EchoGen,
-  D = window.EchoData,
   T = G.T
 
 /* ---------------- 模拟玩家 ---------------- */
@@ -346,7 +345,6 @@ function simulate(seed, maxFloor) {
                 .join(' ') || '无',
             )
             console.error('  最近动作:', lastActs.join(' → '))
-            const W2 = game.level.w
             const GL = {
               0: '#',
               1: '.',

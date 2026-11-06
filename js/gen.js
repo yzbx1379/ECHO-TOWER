@@ -932,7 +932,7 @@
   }
 
   function deadEnd(level, x, y) {
-    const { w, h, grid } = level
+    const { w, grid } = level
     const idx = (x, y) => y * w + x
     const t = grid[idx(x, y)]
     if (t !== T.FLOOR && t !== T.RUBBLE) return false

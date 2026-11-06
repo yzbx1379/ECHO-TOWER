@@ -10,6 +10,12 @@ const path = require('path')
 const URL_DEBUG = process.argv.includes('--url-debug')
 const STUB_DEBUG = URL_DEBUG || process.argv.includes('--debug')
 
+/* 注册表与监听表：makeElement / documentStub 在函数体内引用，提前声明以消除前置引用告警；
+ * 运行时本来就在定义之后才调用，行为不变。 */
+const registry = {}
+const docListeners = {}
+const winListeners = {}
+
 /* ---------------- 最小 DOM 存根 ---------------- */
 function makeClassList() {
   const set = new Set()
@@ -130,9 +136,6 @@ function makeElement(tag) {
   return el
 }
 /* 粗糙选择器：只支持 .class/#tag 匹配已创建元素 */
-const allElements = () => Object.values(registry).concat(extraEls)
-const registry = {}
-const extraEls = []
 function matches(el, sel) {
   if (sel.startsWith('#')) return el.id === sel.slice(1)
   if (sel.startsWith('.')) {
@@ -179,8 +182,6 @@ const documentStub = {
     return true
   },
 }
-const docListeners = {}
-const winListeners = {}
 global.addEventListener = (ev, fn) => {
   ;(winListeners[ev] = winListeners[ev] || []).push(fn)
 }
@@ -339,7 +340,6 @@ ok(game.turnCount >= acts.length - 3, `回合推进 turnCount=${game.turnCount}`
 /* 长按连走：模拟按下方向键 → 延迟后 takeRepeat 应吐出合成动作 */
 {
   const C = global.window.EchoCore
-  const kd = winListeners.keydown || docListeners['keydown']
   const fire = (code) => {
     const ev = { code, repeat: false, preventDefault() {}, shiftKey: false }
     ;(winListeners['keydown'] || []).forEach((f) => f(ev))

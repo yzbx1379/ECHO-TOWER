@@ -6,8 +6,7 @@
 ;(function () {
   'use strict'
   const C = window.EchoCore,
-    G = window.EchoGen,
-    D = window.EchoData
+    G = window.EchoGen
   const T = G.T
   const TS = 36 // 图块像素
 

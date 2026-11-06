@@ -55,5 +55,6 @@ function get(url, redirects) {
       console.log('✗', e.message)
     }
   }
+  if (lastErr) console.error('全部下载源失败，最后错误:', lastErr.message)
   process.exit(1)
 })()

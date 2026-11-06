@@ -6,8 +6,7 @@
  * ========================================================================= */
 ;(function () {
   'use strict'
-  const D = window.EchoData,
-    C = window.EchoCore
+  const D = window.EchoData
 
   /* uid 计数器改为 game 实例级（systems.js buildLevel 每层重置 this.nextUid = 1）。
    * 原先是模块级 let UID —— 同进程多局会互相偏移，而 systems.js 用 uid%2 决定
