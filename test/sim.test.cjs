@@ -22,6 +22,12 @@ window.EchoGen = require(path.join('..', 'js', 'gen.js'));
 require(path.join(__dirname, '..', 'js', 'core.js'));
 require(path.join(__dirname, '..', 'js', 'audio.js'));
 require(path.join(__dirname, '..', 'js', 'entities.js'));
+// systems 按域拆分：mixin 必须先于 systems.js 加载
+require(path.join(__dirname, '..', 'js', 'systems.move.js'));
+require(path.join(__dirname, '..', 'js', 'systems.combat.js'));
+require(path.join(__dirname, '..', 'js', 'systems.hazards.js'));
+require(path.join(__dirname, '..', 'js', 'systems.echo.js'));
+require(path.join(__dirname, '..', 'js', 'systems.progress.js'));
 require(path.join(__dirname, '..', 'js', 'systems.js'));
 
 const G = window.EchoGen, D = window.EchoData, T = G.T;

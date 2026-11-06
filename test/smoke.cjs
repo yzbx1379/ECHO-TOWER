@@ -86,6 +86,26 @@ const ok = (cond, msg) => {
   });
   ok(!!swScope, 'SW registered: ' + (swScope || 'N/A'));
 
+  // ── 3.5 Worker 预生成：结果必须与主线程同步生成逐字段一致（确定性）
+  const pf = await page.evaluate(async () => {
+    if (!window.EchoPrefetch) return { available: false };
+    const seed = 12345, floor = 7;
+    const fromWorker = await window.EchoPrefetch.generate(seed, floor);
+    const direct = window.EchoGen.generateFloor(seed, floor, {});
+    const same = !!fromWorker && !!direct
+      && fromWorker.w === direct.w && fromWorker.h === direct.h
+      && fromWorker.floor === direct.floor && fromWorker.minSteps === direct.minSteps
+      && fromWorker.biomeId === direct.biomeId
+      && JSON.stringify(fromWorker.spawn) === JSON.stringify(direct.spawn)
+      && JSON.stringify(fromWorker.shards) === JSON.stringify(direct.shards)
+      && fromWorker.grid.length === direct.grid.length
+      && fromWorker.grid.every((v, i) => v === direct.grid[i]);
+    return { available: true, same, stats: window.EchoPrefetch.stats() };
+  });
+  ok(pf.available, 'EchoPrefetch 已挂载');
+  ok(pf.same === true, 'Worker 生成的层与主线程同步生成逐字段一致（确定性）');
+  ok(pf.stats && pf.stats.enabled === true, `Worker 路径已启用: ${JSON.stringify(pf.stats)}`);
+
   // ── 4. 开局 → 选职业
   const startBtn = page.locator('#title-btns button', { hasText: /开始攀登|Start Climbing|新的一局|New Run/ }).first();
   await startBtn.click();

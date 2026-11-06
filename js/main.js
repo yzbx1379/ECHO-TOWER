@@ -270,11 +270,19 @@
   function startRun(classId) {
     localStorage.removeItem('echoTower.run');
     meta.runs++; saveMeta(meta);
-    game = window.EchoGame.create({
-      seed: (Math.random() * 1e9) | 0, floor: 1, classId,
-      charms: meta.charmsOwned.slice(), fx: makeFx(),
-    });
-    enterPlay();
+    const seed = (Math.random() * 1e9) | 0;
+    const begin = (level) => {
+      game = window.EchoGame.create({
+        seed, floor: 1, classId, level,
+        charms: meta.charmsOwned.slice(), fx: makeFx(),
+      });
+      enterPlay();
+    };
+    // Worker 可用（https/localhost）→ 首层异步生成；不可用（file://、DOM 桩）
+    // → 完全同步开局，保持「点开始立刻可玩」的既有语义，不引入微任务时序差异。
+    const PF = window.EchoPrefetch;
+    if (PF && PF.enabled()) PF.generate(seed, 1).then(begin, () => begin(null));
+    else begin(PF ? PF.generateSync(seed, 1) : null);
   }
   function continueRun() {
     try {
@@ -296,6 +304,9 @@
     const en = window.EchoLang.isEN();
     if (game.floor > 1) UI.banner(en ? `Floor ${game.floor}` : `第 ${game.floor} 层`, en ? game.level.biome.en : game.level.biome.name);
     else UI.banner(en ? 'Floor 1' : '第 1 层', en ? 'Collect all ◆ shards, then take the exit' : '收集所有 ◆ 碎片，从出口离开');
+    /* 进入楼层后立刻预取下一层：玩家走到出口前 Worker 通常已算完，
+     * nextFloor() 保持同步语义，只是 buildLevel 会直接命中缓存。 */
+    if (window.EchoPrefetch) window.EchoPrefetch.request(game.seed, game.floor + 1);
   }
 
   /* ---------------- 终局 ---------------- */

@@ -132,8 +132,35 @@ node test/smoke.cjs               # 真浏览器截图（沙箱内被拦截时�
 
 ## 📄 许可与来源
 
-- 运行时零第三方依赖；项目自述图形全部由 Canvas 程序化绘制、音效全部由 WebAudio 合成，未包含外部美术/音频素材。在线字体为可选加载，离线自动降级。
-- 本仓库**未附 `LICENSE` 文件，也未声明开源许可**；许可状态以维护者后续补充为准，此处不代为推定或补写。
+- 运行时零第三方依赖；图形全部由 Canvas 程序化绘制、音效全部由 WebAudio 合成，未包含外部美术/音频素材。在线字体为可选加载，离线自动降级。
+- 本项目采用 **MIT License**。按仓库约定，许可全文与来源声明合并进本节，**不单独放 `LICENSE.md`**；`package.json` 的 `license` 字段同步为 `MIT`。
+- Copyright 年份取自本仓库最早提交（2026），持有人取自 git 提交身份 `叶子不小 <yzbx1379@qq.com>`；如需改用其它署名，直接修改下方许可文本与 `package.json` 即可。
+
+### MIT License
+
+```text
+MIT License
+
+Copyright (c) 2026 叶子不小 (yzbx1379)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 
 

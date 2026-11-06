@@ -44,14 +44,19 @@ ok(assets.length >= 10, `ASSETS 项数偏少（${assets.length}）`);
 
 /* ---- 3. 双向比对 ---- */
 const cacheSet = new Set(assets);
+/* Worker 脚本由 new Worker() 加载，不在 index.html 的 src/href 里，
+ * 但离线时必须进缓存。这类资源只校验「存在 + 已缓存」，不要求被 index.html 引用。 */
+const CACHE_ONLY = new Set(['js/gen.worker.js']);
 for (const r of refs) {
   ok(cacheSet.has(r), `index.html 引用了 ${r}，但 sw.js ASSETS 未缓存 → 离线会缺文件`);
 }
 for (const a of assets) {
   if (a === '' || a === 'index.html') continue; // './' 与入口页
   ok(exists(a), `sw.js ASSETS 列出了不存在的文件：${a}`);
+  if (CACHE_ONLY.has(a)) continue;
   ok(refs.has(a), `sw.js 缓存了 ${a}，但 index.html 未引用（陈旧项，建议清理）`);
 }
+for (const f of CACHE_ONLY) ok(cacheSet.has(f), `Worker 专用资源 ${f} 必须进 ASSETS（离线需要）`);
 
 /* ---- 4. manifest 图标存在性 ---- */
 ok(Array.isArray(manifest.icons) && manifest.icons.length > 0, 'manifest 缺少 icons');

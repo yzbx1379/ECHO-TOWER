@@ -2,6 +2,7 @@
   "name": "echo-tower",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "回声之塔 ECHO TOWER —— 100层回声重演爬塔Roguelite（纯HTML5 Canvas，零依赖）",
   "scripts": {
     "test": "node test/gen.test.cjs && node test/sim.test.cjs && node test/dom-stub.cjs && node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug && node test/static.test.cjs",

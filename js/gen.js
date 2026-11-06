@@ -300,27 +300,32 @@
   function heldKarp(D, K) {
     if (K === 0) return D[0][1];
     const FULL = (1 << K) - 1;
-    const dp = new Map();
-    for (let i = 1; i <= K; i++) dp.set((1 << (i - 1)) * 16 + i, D[0][i]);
+    /* dp[mask * STRIDE + i] = 已收集 mask 对应碎片、当前停在第 i 枚碎片时的最小步数。
+     * 原先是 Map<number, number>；K≤7 时状态数不超过 (1<<K)*(K+1) 个，
+     * 用 Float64Array 一次分配 + Infinity 哨兵即可，免去每次试探的哈希与装箱。
+     * STRIDE 取 K+1（节点编号 1..K），不再依赖硬编码的 16。 */
+    const STRIDE = K + 1;
+    const dp = new Float64Array((FULL + 1) * STRIDE + STRIDE);
+    dp.fill(Infinity);
+    for (let i = 1; i <= K; i++) dp[(1 << (i - 1)) * STRIDE + i] = D[0][i];
     for (let mask = 1; mask <= FULL; mask++) {
       for (let i = 1; i <= K; i++) {
         if (!(mask & (1 << (i - 1)))) continue;
-        const cur = dp.get(mask * 16 + i);
-        if (cur === undefined) continue;
+        const cur = dp[mask * STRIDE + i];
+        if (!isFinite(cur)) continue; // 未访问态（原 Map 的 undefined）
         for (let j = 1; j <= K; j++) {
           if (mask & (1 << (j - 1))) continue;
           const nm = mask | (1 << (j - 1));
           const nv = cur + D[i][j];
-          const key = nm * 16 + j;
-          const old = dp.get(key);
-          if (old === undefined || nv < old) dp.set(key, nv);
+          const key = nm * STRIDE + j;
+          if (nv < dp[key]) dp[key] = nv;
         }
       }
     }
     let best = Infinity;
     for (let i = 1; i <= K; i++) {
-      const cur = dp.get(FULL * 16 + i);
-      if (cur !== undefined) best = Math.min(best, cur + D[i][K + 1]);
+      const cur = dp[FULL * STRIDE + i];
+      if (isFinite(cur)) best = Math.min(best, cur + D[i][K + 1]);
     }
     return best;
   }

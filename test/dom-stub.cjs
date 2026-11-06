@@ -151,9 +151,17 @@ require(path.join(__dirname, '..', 'js', 'i18n.js'));
 require(path.join(__dirname, '..', 'js', 'audio.js'));
 require(path.join(__dirname, '..', 'js', 'core.js'));
 require(path.join(__dirname, '..', 'js', 'entities.js'));
+// systems 按域拆分：mixin 必须先于 systems.js 加载
+require(path.join(__dirname, '..', 'js', 'systems.move.js'));
+require(path.join(__dirname, '..', 'js', 'systems.combat.js'));
+require(path.join(__dirname, '..', 'js', 'systems.hazards.js'));
+require(path.join(__dirname, '..', 'js', 'systems.echo.js'));
+require(path.join(__dirname, '..', 'js', 'systems.progress.js'));
 require(path.join(__dirname, '..', 'js', 'systems.js'));
 require(path.join(__dirname, '..', 'js', 'render.js'));
 require(path.join(__dirname, '..', 'js', 'ui.js'));
+require(path.join(__dirname, '..', 'js', 'prefetch.js'));
+// gen.worker.js 由 new Worker() 加载，不在 DOM 桩里 require（依赖 importScripts）
 require(path.join(__dirname, '..', 'js', 'main.js'));
 
 /* 触发 boot */

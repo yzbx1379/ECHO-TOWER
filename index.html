@@ -40,9 +40,16 @@
   <script src="js/audio.js"></script>
   <script src="js/core.js"></script>
   <script src="js/entities.js"></script>
+  <!-- systems 按域拆分：mixin 必须先于 systems.js 加载 -->
+  <script src="js/systems.move.js"></script>
+  <script src="js/systems.combat.js"></script>
+  <script src="js/systems.hazards.js"></script>
+  <script src="js/systems.echo.js"></script>
+  <script src="js/systems.progress.js"></script>
   <script src="js/systems.js"></script>
   <script src="js/render.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/prefetch.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
