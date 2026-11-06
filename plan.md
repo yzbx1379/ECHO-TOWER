@@ -21,7 +21,7 @@ npm run format:check              # Prettier 全量格式门禁(已纳入 CI)
 node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本机执行权限)
 ```
 
-回归标准:`gen.test.cjs` / `sim.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` **0 error / 0 warning**;`npm run format:check` 通过;`smoke.cjs` 26 项全过且零控制台错误。
+回归标准:`gen.test.cjs` / `sim.test.cjs` / `combat.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` **0 error / 0 warning**;`npm run format:check` 通过;`smoke.cjs` 28 项全过且零控制台错误。
 > `format:check` **已是 CI 门禁**(2026-11-06 全量重排后):23 个文件已用 `prettier --write` 统一风格,与 `npm run lint` 同在 CI 的 lint job;降级为可选工具是 2026-10-24 的中间结论,已被推翻(详见任务 9 的状态再更正)。
 
 ---
@@ -186,6 +186,22 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 
 ---
 
+## 2026-11-06 第五轮：全项目复查追加项（原 14 项之外）
+
+> 触发：用户要求「检查整个项目还有什么可改进」；只读复查后按影响列出三项，用户授权「按你的判断来」。
+> 第 ③ 项涉及存档口径，按红线先拍板：**做「可复现」，但用向后兼容方式**——只新增可选 `rng` 字段，不改 `v:1`、不改已有存档结构、不触碰已有数据。
+
+| 项 | 发现（证据） | 处置 |
+| --- | --- | --- |
+| 🔴 SW 缓存版本从未 bump | `sw.js` 原 `CACHE='echo-tower-v1'`,`git log -p` 显示自 c77c444 引入后未变;但 ASSETS 15→22、index.html 的 script 10→17,stale-while-revalidate 可能让新旧页面/脚本混合 | 缓存名改为 `cacheKey(ASSETS)`(FNV-1a 派生),清单变即换名、activate 清旧;导航 network-first + 离线回落。`static.test` 加 3 条防回退断言,`smoke` 实测缓存名与断网 reload |
+| 🔴 玩家无法死亡（真 bug） | `damagePlayer` 扣血后调 `recalcStats()`,后者 `Math.max(1,…)` 把 HP 夹到至少 1,而 `if (p.hp<=0)` 在其后;`this.over=true` 全项目仅此一处 | 新增 `test/combat.test.cjs`(真实 6~8 HP、20 项)覆盖无敌帧/护甲/防爆盾/闪避/影行者/不倒钟摆/凤羽烬/不灭烛/失败结算;修复改用扣血后的 `lethal` 判定并在分支内把 hp 归零 |
+| 🔴 sim.test 的 9999 HP 是假 | 同一 `recalcStats()` 会把直写的 hp 夹回真实 maxHp;修好死亡后 seed=20250101 在 F3 倒地 | 改走 `bonus.maxHp` 正规通道,三种子通关回合数 15886/16938/15348 与之前**逐位一致** |
+| 🟡 存档随机流不可复现 | `snapshot()` 不存 rng、`restoreFrom()` 不恢复;构造按 floor 派生种子,正常爬塔却是连续流 | `mulberry32` 加 `getState/setState`,snapshot 增可选 `rng` 整数,restoreFrom 有则恢复、无则原行为;dom-stub 加 3 条(后续随机流逐位一致 + 旧存档兼容) |
+
+> 口径备注：本次修复**改变了游戏行为**——玩家现在会真正死亡，凤羽烬 / 不灭烛 / 失败结算开始生效。
+> 这是修正既有缺陷，不是平衡调整；`combat.test.cjs` 已把该行为固化为回归。
+> 复查中另列出的中优先级项（debugJumpFloor 与 nextFloor 的 rng 不一致、prefetch 超时状态不一致、mixin 同名静默覆盖）本轮**未动**，避免范围膨胀。
+
 ## 变更记录
 
 | 日期       | 内容                          |
@@ -224,3 +240,9 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | 🔍 390 宽小字号复检:放大图确认 ⚡N/M 与 ⚡N 无衬底偏小,统一 11px + 深色衬底并移出 pulse |
 | 2026-11-06 | 🧪 smoke 扩至 26/26:新增 SMALL_FONT_PX 下限与 ⚡ 文字带衬底/对比度防回归断言 |
 | 2026-11-06 | 📝 README/plan 把「建议复检」更新为实测 + 改善结论,smoke 口径 24→26 项 |
+| 2026-11-06 | 🔍 全项目只读复查:列出 SW 缓存版本 / 真实 HP 测试盲区 / 存档随机流三项优先改进 |
+| 2026-11-06 | 🔧 SW 版本化缓存(CACHE 由 ASSETS 派生)+ navigation network-first,smoke 实测断网 reload 通过 |
+| 2026-11-06 | 🐛 **修真 bug**:recalcStats 把 HP 夹到 1 导致玩家永不死亡、复活与失败结算失效;新增 combat.test 20 项 |
+| 2026-11-06 | 🧪 sim.test 改走 bonus.maxHp 正规通道(原 9999 HP 是假),三种子回合数逐位不变 |
+| 2026-11-06 | 💾 存档随机流可复现:mulberry32 暴露状态,snapshot 增可选 rng 字段,v:1 不变、旧存档兼容 |
+| 2026-11-06 | 📊 项数:static 73→76、dom-stub 36/48/48→39/51/51、smoke 26→28、新增 combat 20 项 |

@@ -341,6 +341,8 @@
     Object.assign(this.runStats, s.runStats || {})
     this.reviveUsed = s.reviveUsed || { phoenix: false, charm: false }
     this.lastRecording = s.lastRecording || []
+    // v1 新增可选字段：有则恢复随机流，旧存档（undefined）保持原行为
+    if (s.rng != null && typeof this.rng.setState === 'function') this.rng.setState(s.rng)
     this.buildLevel()
     this.initPlayer()
     this.player.hp = Math.max(1, Math.min(s.hp || 6, this.player.maxHp))

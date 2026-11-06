@@ -48,6 +48,10 @@ ok(assets.length >= 10, `ASSETS 项数偏少（${assets.length}）`)
 
 /* ---- 3. 双向比对 ---- */
 const cacheSet = new Set(assets)
+/* ---- 2.5 SW 缓存版本化：清单一变缓存名就变，导航请求 network-first ---- */
+ok(/const CACHE = cacheKey\(ASSETS\)/.test(sw), 'SW 缓存名由 ASSETS 清单派生（版本化）')
+ok(!/const CACHE = ['"]echo-tower-v\d/.test(sw), 'SW 不再硬编码缓存版本号')
+ok(/req\.mode === 'navigate'/.test(sw), 'SW 导航请求走 network-first（防混合版本）')
 /* Worker 脚本由 new Worker() 加载，不在 index.html 的 src/href 里，
  * 但离线时必须进缓存。这类资源只校验「存在 + 已缓存」，不要求被 index.html 引用。 */
 const CACHE_ONLY = new Set(['js/gen.worker.js'])

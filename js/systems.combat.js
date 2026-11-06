@@ -483,13 +483,18 @@
           this.fx.toast('⏳ 不倒钟摆救了你一命！')
         }
         p.hp -= n
+        // recalcStats() 会把 HP 夹到 Math.max(1, ...)（防止负数显示），
+        // 所以致死判定必须用扣血后的原始结果；否则玩家永远死不了，
+        // 凤羽烬 / 不灭烛 / 失败结算全部不会触发（combat.test.cjs 实测发现）。
+        const lethal = p.hp <= 0
         this.invulnTurns = Math.max(this.invulnTurns, 1)
         this.fx.sfx('hurt')
         this.fx.shake(kind === 'explosion' ? 7 : 4)
         this.fx.floatText(p.x, p.y - 0.5, '-' + n, '#ff6b6b', true)
         this.fx.burst(p.x, p.y, '#ff6b6b', 12)
         this.recalcStats()
-        if (p.hp <= 0) {
+        if (lethal) {
+          p.hp = 0 // 抵消上面的夹紧：复活分支会改成 3 HP，死亡时 HUD/结算显示 0
           // 复活检查：凤羽烬 → 不灭烛护符
           if (this.has('phoenix') && !this.reviveUsed.phoenix) {
             this.reviveUsed.phoenix = true

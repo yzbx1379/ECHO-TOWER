@@ -80,10 +80,11 @@ js/audio.js             WebAudio 合成音效与环境音乐
 js/prefetch.js          楼层预生成调度（Worker 缓存 + 同步 fallback）
 js/gen.worker.js        地牢生成 Worker（由 new Worker 加载，非 <script>）
 js/main.js              标题流程/输入泵/主循环/存档/调试开关
-sw.js                   Service Worker 预缓存清单（stale-while-revalidate）
+sw.js                   Service Worker（ASSETS 清单派生版本化缓存 + navigation network-first）
 manifest.webmanifest    PWA 安装清单
 test/gen.test.cjs       生成器自动化测试（5 种子 × 100 层）
 test/sim.test.cjs       端到端逻辑模拟（3 种子通关 F100 → F101）
+test/combat.test.cjs    真实 HP 战斗 / 死亡 / 复活回归（20 项，不用 9999 HP）
 test/dom-stub.cjs       DOM 桩冒烟（常规 / --debug / --url-debug 三种模式）
 test/static.test.cjs    index.html ↔ sw.js 缓存清单一致性（含 Worker 白名单）
 test/smoke.cjs          Playwright 浏览器截图冒烟（需本机执行权限）
@@ -101,16 +102,17 @@ npm run format:check     # Prettier 全量格式门禁，已纳入 CI
 
 node test/gen.test.cjs            # 12,950 项断言：可解性 + 每层≥50步（约 2.8ms/层）
 node test/sim.test.cjs            # 端到端：3 种子真实爬塔通关 F100 → F101
+node test/combat.test.cjs         # 20 项：真实 6~8 HP 的减伤/闪避/复活/失败结算
 node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘制分支
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
-node test/static.test.cjs         # 73 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单）
-node test/smoke.cjs               # 真浏览器 26 项（PWA/Worker/灰度/三分辨率/触屏/小字号）
+node test/static.test.cjs         # 76 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单与 SW 版本化）
+node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三分辨率/触屏/小字号/SW 离线回落）
 ```
 
-`npm test` 依次执行 `gen` → `sim` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败。
+`npm test` 依次执行 `gen` → `sim` → `combat` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、导航请求 network-first。
 
-> 质检口径：以上为**代码检测结果**；另在 Chromium headless 跑 `npm run smoke:browser`，**26/26 通过、控制台零错误**——含 Worker 生成层与主线程同步生成逐字段一致、http 换层预取命中、`file://` 双击同步兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号八类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部亮度 `min=8 / max=245 / spread=237`，白字深底仍可辨；三分辨率横向溢出均为 0。**小字号复检已闭环**：390 宽放大图确认门上方 `⚡N/M`（原 10px）与压力板下方 `⚡N`（原 9px）无衬底、贴深绿地砖与呼吸光环不易辨；已统一 11px 并加深色衬底、移出 pulse 透明度，改后文字带 spread 188→201 / 180→191，`smoke.cjs` 第 26 项固化字号下限与衬底断言。仍不记作「达标」——真实设备的字体渲染差异不在自动化覆盖内。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 39/51/51、static 76/76）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**本轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，而致死判定在其后，导致玩家永不死亡、凤羽烬/不灭烛/失败结算全部失效；现改用扣血后的 `lethal` 判定（combat.test.cjs 第 13–19 项固化）。仍不记作「达标」——真实设备字体渲染差异不在自动化覆盖内。
 
 ## 🐞 调试模式
 
@@ -136,6 +138,8 @@ node test/smoke.cjs               # 真浏览器 26 项（PWA/Worker/灰度/三�
 - 存档位于 localStorage：`echoTower.run`（当前局）/ `echoTower.meta`（元进度）/ `echoTower.debug`（可选调试开关）。
 - 代码风格已用 `prettier --write` **全量统一**（23 个文件、+6491/−4016 行纯格式改动，单独提交以便 review）；`npm run lint` 与 `npm run format:check` **均为 CI 门禁**。27 条存量 ESLint warning 已全部清理（未用变量删除/补齐真实用途、`ui.js` 的 `close` 定义提前、DOM 桩声明提前、`fetch-browser.cjs` 补上失败诊断输出），当前 **0 error / 0 warning**。
 - 楼层预生成：`js/gen.worker.js` 在 Worker 中跑 Dijkstra + Held-Karp，`js/prefetch.js` 负责首层异步生成与下一层预取；`nextFloor()` 保持同步语义，命中缓存即零阻塞。`file://` 双击、DOM 桩、Worker 加载失败一律走同步 fallback，双击 `index.html` 仍可玩。`sim.test.cjs` 不加载该模块，端到端模拟确定性不受影响。
+- PWA 缓存：`sw.js` 的缓存名由 `ASSETS` 清单内容（FNV-1a）自动派生，清单变化即换缓存、activate 清旧缓存；导航请求 network-first，离线时回落预缓存（`smoke.cjs` 实测断网 reload 仍可打开）。不再需要人工 bump 版本号。
+- 存档确定性：`mulberry32` 暴露 `getState/setState`，`snapshot()` 新增可选 `rng` 整数（存档 `v: 1` 不变），`restoreFrom()` 有则恢复。续爬后的暴击 / 闪避 / 掉落 / 商店随机流与首次连续游玩逐位一致；旧存档缺该字段时保持原行为，无需迁移。
 - `package-lock.json` 原为陈旧文件（`"name": "geom"` 且无 devDependencies），2026-10-24 随 `npm install` 重建为 `echo-tower` 并补全 3 个 devDependencies，使 `npm ci` 可用；仅安装期依赖，不进入运行时。
 - CI（`.github/workflows/ci.yml`）三个并行 job：Node 测试、ESLint + Prettier（lint + format:check）、Playwright 浏览器冒烟。
 

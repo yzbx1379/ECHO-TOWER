@@ -197,9 +197,12 @@ function simulate(seed, maxFloor) {
       onVictory: () => {},
     },
   })
-  // 测试作弊：巨大生命值（专注验证逻辑链路而非平衡）
-  game.player.maxHp = 9999
-  game.player.hp = 9999
+  // 测试作弊：巨大生命值（专注验证逻辑链路而非平衡）。
+  // 必须走 bonus.maxHp 正规通道：直接写 player.maxHp/hp 会被 damagePlayer 末尾的
+  // recalcStats() 夹回真实 maxHp，修复「玩家无法死亡」bug 后机器人会在 F3 倒地。
+  game.bonus.maxHp = 9990
+  game.recalcStats()
+  game.player.hp = game.player.maxHp
   let totalTurns = 0
   const log = []
   const lastActs = []

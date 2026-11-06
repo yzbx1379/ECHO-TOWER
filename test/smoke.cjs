@@ -106,6 +106,31 @@ const ok = (cond, msg) => {
   })
   ok(!!swScope, 'SW registered: ' + (swScope || 'N/A'))
 
+  // ── 3.2 离线回落：SW 预缓存完成后断网 reload，navigation 应回落到缓存
+  {
+    const off = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+    const op = await off.newPage()
+    await op.goto(`http://localhost:${PORT}/`)
+    await op.waitForSelector('.title-name', { timeout: 5000 })
+    await op.waitForTimeout(1500) // 等 SW install + addAll 完成
+    const cachedNames = await op.evaluate(() => caches.keys())
+    ok(
+      cachedNames.length === 1 && /^echo-tower-/.test(cachedNames[0]),
+      `版本化缓存名: ${cachedNames.join(',') || 'N/A'}`,
+    )
+    await off.setOffline(true)
+    let offlineOk = true
+    try {
+      await op.reload()
+      await op.waitForSelector('.title-name', { timeout: 5000 })
+    } catch (e) {
+      offlineOk = false
+    }
+    ok(offlineOk, '离线 reload 仍能打开标题界面（navigation 回落缓存）')
+    await off.setOffline(false)
+    await off.close()
+  }
+
   // ── 3.5 Worker 预生成：结果必须与主线程同步生成逐字段一致（确定性）
   const pf = await page.evaluate(async () => {
     if (!window.EchoPrefetch) return { available: false }

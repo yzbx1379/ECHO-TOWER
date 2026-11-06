@@ -455,6 +455,32 @@ window.EchoLang.set('zh')
   ok(bad === false, '篡改码被拒')
 }
 
+/* 存档随机流复现：v1 新增可选 rng 字段，旧存档无该字段时保持原行为 */
+{
+  const A = window.EchoGame.create({ seed: 777, floor: 3, classId: 'knight' })
+  for (let i = 0; i < 37; i++) A.rng()
+  const snap = A.snapshot()
+  ok(Number.isInteger(snap.rng), `snapshot 含可序列化 rng 状态 (${snap.rng})`)
+  const expected = Array.from({ length: 12 }, () => A.rng())
+  const B = window.EchoGame.create({ seed: 1, floor: 1, classId: 'ranger' })
+  B.restoreFrom(snap)
+  const actual = Array.from({ length: 12 }, () => B.rng())
+  ok(
+    expected.every((v, i) => v === actual[i]),
+    '续爬后随机流逐位一致（暴击/掉落/商店可复现）',
+  )
+  const legacy = Object.assign({}, snap)
+  delete legacy.rng
+  const C2 = window.EchoGame.create({ seed: 1, floor: 1, classId: 'ranger' })
+  let noThrow = true
+  try {
+    C2.restoreFrom(legacy)
+  } catch (e) {
+    noThrow = false
+  }
+  ok(noThrow && C2.floor === 3, '旧存档（无 rng 字段）恢复不抛错且楼层正确')
+}
+
 /* 渲染层：离屏缓存脏格消费（炸弹炸墙视觉 bug 回归保障） */
 {
   const game = window.EchoGame.create({

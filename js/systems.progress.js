@@ -316,6 +316,8 @@
           lastRecording: this.echo && this.echo.alive && this.echo.spawned ? [] : this.recording.slice(),
           runStats: this.runStats,
           reviveUsed: this.reviveUsed,
+          // 可选字段：v1 存档新增，旧存档缺此字段时 restoreFrom 不恢复随机流
+          rng: this.rng.getState ? this.rng.getState() : null,
         }
       }
       autosave() {
