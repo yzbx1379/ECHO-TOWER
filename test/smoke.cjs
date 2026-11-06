@@ -78,8 +78,13 @@ const ok = (cond, msg) => {
   await page.reload();
   await page.waitForSelector('.title-name', { timeout: 5000 });
   await page.waitForTimeout(1500); // SW install + skipWaiting + activate
-  const sw = await page.evaluate(async () => await navigator.serviceWorker.getRegistration());
-  ok(!!sw, 'SW registered: ' + (sw ? sw.scope : 'N/A'));
+  // 直接回传字符串：ServiceWorkerRegistration 跨进程序列化会丢失原型上的 scope，
+  // 旧写法只能断言非空、日志却显示 undefined，无法核验注册到了哪个 scope。
+  const swScope = await page.evaluate(async () => {
+    const r = await navigator.serviceWorker.getRegistration();
+    return r ? r.scope : null;
+  });
+  ok(!!swScope, 'SW registered: ' + (swScope || 'N/A'));
 
   // ── 4. 开局 → 选职业
   const startBtn = page.locator('#title-btns button', { hasText: /开始攀登|Start Climbing|新的一局|New Run/ }).first();

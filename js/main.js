@@ -28,6 +28,44 @@
   function saveMeta(m) { localStorage.setItem(META_KEY, JSON.stringify(m)); }
   let meta = loadMeta();
 
+  /* ---------------- 调试模式开关 ----------------
+   * 两种开启方式：URL ?debug=1 或 localStorage.echoTower.debug=1。
+   * 关闭时不注册监听、不挂全局 API、不绘制叠层，正式玩法路径零变化。
+   * 读取全程 try/catch + typeof 保护，DOM 桩 / file:// / 隐私模式都不会抛错。
+   */
+  const DEBUG_KEY = 'echoTower.debug';
+  function debugEnabled() {
+    try {
+      const q = (typeof window !== 'undefined' && window.location && window.location.search) || '';
+      if (/[?&]debug=1(?:&|$)/.test(q)) return true;
+      if (typeof localStorage !== 'undefined' && localStorage.getItem(DEBUG_KEY) === '1') return true;
+    } catch (e) { /* 受限环境一律按关闭处理 */ }
+    return false;
+  }
+  const DEBUG = debugEnabled();
+
+  function debugJump(delta) {
+    if (!game) return false;
+    if (!game.debugJumpFloor(delta)) return false;
+    C.clearActions();
+    UI.updateHUD(game);
+    return true;
+  }
+  function toggleDebugInvuln() {
+    if (!game) return false;
+    game.debugInvuln = !game.debugInvuln;
+    UI.toast(`[DEBUG] 无敌 ${game.debugInvuln ? 'ON' : 'OFF'}`);
+    return game.debugInvuln;
+  }
+  function onDebugKey(e) {
+    if (e.repeat || state !== 'playing' || !game || game.over) return;
+    const code = e.code;
+    if (code !== 'BracketLeft' && code !== 'BracketRight' && code !== 'KeyI') return;
+    e.preventDefault();
+    if (code === 'KeyI') toggleDebugInvuln();
+    else debugJump(code === 'BracketRight' ? 1 : -1);
+  }
+
   /* ---------------- 启动 ---------------- */
   function boot() {
     UI.init();
@@ -36,6 +74,24 @@
     mctx = document.getElementById('minimap').getContext('2d');
     C.setupCanvas(canvas);
     C.bindInput(canvas);
+    if (DEBUG) {
+      window.addEventListener('keydown', onDebugKey);
+      window.__echoDebug = {
+        enabled: true,
+        jump: debugJump,
+        toggleInvuln: toggleDebugInvuln,
+        get state() {
+          return {
+            floor: game ? game.floor : null,
+            seed: game ? game.seed : null,
+            invuln: !!(game && game.debugInvuln),
+            steps: game ? game.stepsThisFloor : null,
+            opt: game && game.level ? game.level.minSteps : null,
+            rec: game ? game.recording.length : null,
+          };
+        },
+      };
+    }
     A.setMuted(meta.muted);
     titleScreen();
     requestAnimationFrame(loop);
@@ -329,6 +385,7 @@
       C.updateFloaters(effDt);
       R.render(ctx, game, canvas, t / 1000);
       R.drawMinimap(mctx, game, document.getElementById('minimap'));
+      if (DEBUG) R.drawDebugOverlay(ctx, game, canvas);
     }
     requestAnimationFrame(loop);
   }

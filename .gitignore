@@ -12,6 +12,9 @@ test/shot_*.png
 # 本地备份文件
 settings.yaml.backup
 
+# 本地工具目录（助手工作区/记忆，勿入公开仓库）
+.workbuddy/
+
 # 系统文件
 Thumbs.db
 .DS_Store

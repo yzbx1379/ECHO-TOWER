@@ -24,6 +24,15 @@
     if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
   }
 
+  /* ---------------- 色盲友好：门 / 压力板分组标记 ----------------
+   * 分组原先只靠 4 种组色(gc)关联，灰度或红绿色觉障碍下无法判断哪块板开哪扇门。
+   * 在门与压力板上叠加同一个组号数字，组色退为辅助线索；数字与颜色一一对应且稳定。
+   */
+  function groupMark(group) {
+    const g = ((Number(group) || 0) % 4 + 4) % 4;
+    return String(g + 1);
+  }
+
   /* ---------------- 主渲染 ---------------- */
   function render(ctx, game, canvas, time) {
     const dpr = canvas.__dpr || 1;
@@ -262,6 +271,16 @@
           ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
           ctx.fillText('⚡' + String((g && g.charge) || 0) + '/' + String((g && g.need) || '?'), px + TS / 2, py - 2);
           ctx.restore();
+          // 组号徽记：与同组压力板数字一致，灰度下仍可配对
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,.78)';
+          ctx.fillRect(px + 3, py + 3, 12, 12);
+          ctx.strokeStyle = gc; ctx.lineWidth = 1;
+          ctx.strokeRect(px + 3.5, py + 3.5, 11, 11);
+          ctx.fillStyle = '#f5f5f5';
+          ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(groupMark(g ? g.group : 0), px + 9, py + 9.5);
+          ctx.restore();
         }
         break;
       }
@@ -275,7 +294,10 @@
         ctx.save();
         ctx.shadowColor = gc; ctx.shadowBlur = done ? 0 : 10;
         circle(ctx, px + TS / 2, py + TS / 2, pr, '#3a3020', gc, 2.5);
-        circle(ctx, px + TS / 2, py + TS / 2, 3.5, done ? '#555' : gc);
+        // 组号取代无信息量的中心圆点：与同组栅栏门徽记一致
+        ctx.fillStyle = done ? '#9a9a9a' : '#f5f5f5';
+        ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(groupMark(pl ? pl.group : 0), px + TS / 2, py + TS / 2 + 0.5);
         if (!done && linked) {
           ctx.fillStyle = gc; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
           ctx.fillText('⚡' + (linked.need - Math.min(linked.charge || 0, linked.need)), px + TS / 2, py + TS - 1);
@@ -635,5 +657,43 @@
     mctx.fillRect(game.player.x * scale - 1, game.player.y * scale - 1, scale + 2, scale + 2);
   }
 
-  window.EchoRender = { render, drawMinimap, TS };
+  /* ---------------- 调试叠层（?debug=1，由 main.js 显式调用） ----------------
+   * 刻意不改动 render()：调试关闭时本函数一次都不会执行，正式渲染路径零变化。
+   * 坐标系为屏幕空间（render 结束后 transform 仍是 dpr 缩放，这里再显式设一次）。
+   */
+  function drawDebugOverlay(ctx, game, canvas) {
+    if (!game || !game.level || !game.player) return;
+    const dpr = canvas.__dpr || 1;
+    const W = canvas.width / dpr, H = canvas.height / dpr;
+    const L = game.level, p = game.player;
+    const got = L.shards.filter((s) => s.got).length;
+    const echoOn = !!(game.echo && game.echo.alive && game.echo.spawned);
+    const opt = L.minSteps || 0, steps = game.stepsThisFloor || 0;
+    const lines = [
+      `DEBUG  F${game.floor}/100  seed=${game.seed}  pos=(${p.x},${p.y})`,
+      `OPT=${opt}  steps=${steps}  delta=${steps - opt}  turns=${game.turnCount}`,
+      `rec=${game.recording.length}  prev=${game.lastRecording.length}  echo=${echoOn ? 'ON' : 'OFF'}`,
+      `shards=${got}/${L.shards.length}  exitLock=${!!L.exitLock}  hp=${p.hp}/${p.maxHp}`,
+      `invuln=${game.debugInvuln ? 'ON' : 'OFF'}   [ ] floor   I invuln`,
+    ];
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = "12px Consolas,Menlo,monospace";
+    const pad = 8, lh = 16, boxW = Math.min(330, Math.max(120, W - 16)), boxH = pad * 2 + lines.length * lh;
+    const bx = 8, by = Math.max(8, H - boxH - 8);
+    ctx.fillStyle = 'rgba(6,10,18,.82)';
+    ctx.fillRect(bx, by, boxW, boxH);
+    ctx.strokeStyle = 'rgba(127,216,255,.65)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, boxW - 1, boxH - 1);
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillStyle = i === 0 ? '#ffd27d' : '#cfe8f5';
+      ctx.fillText(lines[i], bx + pad, by + pad + i * lh);
+    }
+    ctx.restore();
+  }
+
+  window.EchoRender = { render, drawMinimap, drawDebugOverlay, groupMark, TS };
 })();

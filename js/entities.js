@@ -8,12 +8,19 @@
   'use strict';
   const D = window.EchoData, C = window.EchoCore;
 
-  let UID = 1;
+  /* uid 计数器改为 game 实例级（systems.js buildLevel 每层重置 this.nextUid = 1）。
+   * 原先是模块级 let UID —— 同进程多局会互相偏移，而 systems.js 用 uid%2 决定
+   * 敌人初始冷却，导致"同 seed 单独跑与连跑结果不同"的非确定性。
+   * 这里保留兜底，兼容未初始化 nextUid 的调用方（如测试桩）。 */
+  function nextUid(game) {
+    if (game.nextUid == null) game.nextUid = 1;
+    return game.nextUid++;
+  }
 
   /* ---------------- 数值成长 ---------------- */
   function scaledDef(type, depth) {
     const base = D.ENEMIES[type];
-    const mul = 1 + Math.max(0, depth) * D.BAL.hpPerDepth;
+    const mul = (1 + Math.max(0, depth) * D.BAL.hpPerDepth) * D.BAL.threatMul(depth);
     return {
       ...base,
       hp: Math.max(1, Math.round(base.hp * mul)),
@@ -30,7 +37,7 @@
       const bdef = D.BOSSES.find((b) => b.id === bid);
       const emul = game.floor > 100 ? D.BAL.endlessMul(game.floor) : 1;
       return {
-        uid: UID++, type, bossId: bid, def: bdef, name: bdef.name,
+        uid: nextUid(game), type, bossId: bid, def: bdef, name: bdef.name,
         x, y, px: x, py: y, hp: Math.round(bdef.hp * emul), maxHp: Math.round(bdef.hp * emul),
         dmg: bdef.dmg + Math.floor(game.floor / D.BAL.dmgStep),
         xp: 30 + bdef.floor, gold: 40 + bdef.floor * 2,
@@ -39,7 +46,7 @@
     }
     const def = scaledDef(type, game.floor);
     return {
-      uid: UID++, type, def, name: def.name,
+      uid: nextUid(game), type, def, name: def.name,
       x, y, px: x, py: y, hp: def.hp, maxHp: def.hp, dmg: def.dmg,
       xp: def.xp, gold: def.gold,
       ai: def.ai, st: {}, flashT: 0, dead: false, facing: 1,
@@ -202,7 +209,29 @@
     },
     bomber(game, e) {
       const p = game.player;
-      if (manhattan(e.x, e.y, p.x, p.y) <= 1) { game.explode(e.x, e.y, 1, 3, e); game.killEnemy(e, true); return true; }
+      // 两阶段：第一阶段进入"冒烟蓄力"（st.fuse 回合倒计时），第二阶段真正爆炸
+      if (e.st.fuse > 0) {
+        e.st.fuse--;
+        if (e.st.fuse <= 0) {
+          e.st.fuseFired = true;
+          e.st.fuseWarn = false;
+          game.explode(e.x, e.y, 1, 3, e);
+          game.killEnemy(e, true);
+          return true;
+        }
+        // 冒烟中不移动，只闪
+        e.st.fuseWarn = true;
+        e.flashT = 0.3;
+        return false;
+      }
+      e.st.fuseWarn = false;
+      const dist = manhattan(e.x, e.y, p.x, p.y);
+      // 进入 1 格范围内且尚未蓄力 → 开始蓄力（1 回合预警），不立即爆炸
+      if (dist <= 1) {
+        e.st.fuse = 1;
+        game.onTelegraph(e);
+        return false;
+      }
       const f = game.playerField;
       const mv = stepDownhill(game, e, f);
       if (mv) game.moveEnemy(e, mv[0], mv[1]);
@@ -237,31 +266,7 @@
    * ================================================================ */
   const BOSS = {
     gemini(game, e) {
-      // 双子：每尊第一次死亡后，由另一尊在 3 回合后将其半血复活；第二次死亡即永逝
-      const p = e.st.partner;
-      if (!p) return AI.slug(game, e);
-      if (p.dead && p.st.reviveQueued == null && (p.st.revivesLeft == null ? 1 : p.st.revivesLeft) > 0) {
-        p.st.reviveQueued = 3;
-      }
-      if (p.st.reviveQueued != null) {
-        p.st.reviveQueued--;
-        if (p.st.reviveQueued <= 0) {
-          p.st.revivesLeft = (p.st.revivesLeft == null ? 1 : p.st.revivesLeft) - 1;
-          if (p.dead) {
-            p.dead = false;
-            p.hp = Math.ceil(p.maxHp / 2);
-            // 复活在幸存者身旁
-            const spots = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-            for (const [dx, dy] of spots) {
-              if (game.enemyCanEnter(p, e.x + dx, e.y + dy)) { p.x = e.x + dx; p.y = e.y + dy; break; }
-            }
-            p.px = p.x; p.py = p.y;
-            game.burstAt(p.x, p.y, '#8fe388', 20);
-            game.toast('双子重新站起（半血）——它只剩一次机会了！');
-          }
-          p.st.reviveQueued = null;
-        }
-      }
+      // 双子：复活逻辑已移至 endTurn 全局驱动（systems.js），此处仅做普通追击
       return AI.slug(game, e);
     },
     clock(game, e) {
@@ -281,9 +286,9 @@
     frost(game, e) {
       e.st.t = (e.st.t || 0) + 1;
       const p = game.player;
-      if (e.st.t % 4 === 0) { // 冰环扩散
+      if (e.st.t % 4 === 0) { // 冰环扩散：先预警 1 回合再造成伤害
         const r = 2 + (Math.floor(e.st.t / 4) % 3);
-        game.ringSlam(e.x, e.y, r, e.dmg, '#7fd8ff');
+        game.ringSlam(e.x, e.y, r, e.dmg, '#7fd8ff', 1);
       }
       if (e.st.t % 7 === 0) { // 冰锥雨：预警玩家周围3格
         for (let i = 0; i < 3; i++) {

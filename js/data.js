@@ -15,7 +15,8 @@
     baseATK: 2,
     hpPerDepth: 0.035,    // 敌人 HP 深度系数
     dmgStep: 25,          // 每 25 层敌人伤害 +1
-    xpNeed: (lv) => 10 + (lv - 1) * 7,
+    // 前期压低升级门槛：lv1→2 只需 6 点，让首波三选一出现在前 2-3 层；后期维持原曲线
+    xpNeed: (lv) => (lv <= 2 ? 6 : 10 + (lv - 2) * 7),
     goldBase: 3,
     shopFloors: (f) => f > 2 && f < 100 && f % 7 === 4, // 4,11,18,...,95
     bossEvery: 10,
@@ -23,6 +24,10 @@
     stepTarget: (f) => Math.min(76, 52 + Math.floor((Math.max(1, f) - 1) / 10) * 4), // ≥50 硬指标，含缓冲
     shardCount: (f) => Math.min(7, 3 + Math.floor(Math.max(1, f) / 22)),
     enemyCount: (f) => Math.min(14, 3 + Math.round(f * 0.12)),
+    // 前期强化威胁：1-10 层敌人 +30% HP，避免开局太弱；11 层起恢复原曲线
+    threatMul: (f) => (f <= 10 ? 1.3 : 1),
+    // 稳健奖励：每通关一层固定给 2 回尘（不依赖击碎回声），让稳打不吃亏
+    dustPerFloor: 2,
     endlessMul: (f) => 1 + Math.max(0, f - 100) * 0.05, // 无尽模式成长
   };
 
@@ -223,10 +228,10 @@
     bosses: {
       gemini: { n: 'Gemini Warden', h: 'Twin mirrored guardians act in sync — each rises once at half HP. Break both twice!' },
       clock: { n: 'Clock Tyrant', h: 'Radial barrages and tile-flipping arrows — walk against the push.' },
-      frost: { n: 'Frost Heart', h: 'Expanding frost rings and telegraphed icicles — stay off the marked tiles.' },
+      frostheart: { n: 'Frost Heart', h: 'Expanding frost rings and telegraphed icicles — stay off the marked tiles.' },
       molten: { n: 'Molten Colossus', h: 'Triple charge leaves lava trails; slamming into walls stuns him.' },
       hourglass: { n: 'Hourglass King', h: 'Every 8 turns he drags you 4 steps into the past — anticipate it!' },
-      eye: { n: 'Void Eye', h: 'Orbiting orbs in darkness — strike only while the eye is open.' },
+      voideye: { n: 'Void Eye', h: 'Orbiting orbs in darkness — strike only while the eye is open.' },
       choir: { n: 'Echo Choir', h: 'Three echoes replay your moves; the conductor is invulnerable until they fall.' },
       janus: { n: 'Janus', h: 'Light and dark phases alternate — only the solid form can be hurt.' },
       weaver: { n: 'The Weaver', h: 'A rotating laser web — keep moving with the safe arc.' },

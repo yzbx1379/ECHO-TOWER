@@ -9,7 +9,7 @@ module.exports = {
   rules: {
     'no-undef': 'error',
     'no-unused-vars': ['warn', { args: 'none', vars: 'local' }],
-    'no-empty': ['warn', { allowStatementCursors: true }],
+    'no-empty': ['warn', { allowEmptyCatch: true }],
     'no-cond-assign': 'error',
     'no-fallthrough': 'warn',
     'no-self-assign': 'warn',
@@ -18,8 +18,10 @@ module.exports = {
   },
   overrides: [
     {
+      // 测试脚本用 global.window = global 桩模拟浏览器，同时用 require/process/__dirname，
+      // 因此 node + browser 都要开，否则 window/document/localStorage 会被 no-undef 误报
       files: ['test/**/*.cjs'],
-      env: { node: true, browser: false },
+      env: { node: true, browser: true },
       parserOptions: { ecmaVersion: 2022, sourceType: 'script' },
     },
   ],

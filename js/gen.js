@@ -114,6 +114,161 @@
     return dist;
   }
 
+  /* ---------------- 推动语义可达性（软锁防护） ----------------
+   * stateBFS 把箭头当普通可通行格（不建模推动），无法发现"单向阀"软锁：
+   * 一排同向箭头可把玩家泄进封闭区域且无法返回（seed 777 F24 实测——
+   * 斜向双向下箭头封住含出口的水槽，2 枚碎片在槽外，全层不可完成）。
+   * realBFS 复刻 systems.js doMove 的完整移动语义：
+   *   初始移动（墙/实相/关门不可，出口可站）→ 冰面滑行 → 传送门 → 箭头推动链
+   *   （最多 3 连，落点需过 enemyCanEnter + arrowPushSafe 双校验，玩家占位于当前格）
+   * 建模取舍（均有依据）：
+   *   - 忽略敌人：可击杀/可移动，不构成永久阻挡
+   *   - 相位墙视为可通过：周期开放，等待即可（与 stateBFS 立场一致）
+   *   - 栅栏门视为可通过：踩板充能开启，板的"无门可达性"由布置逻辑保证
+   *   - 冰面按无冰爪/弹簧靴的全滑行语义：与 stateBFS 一致（持有者停止点更多，是子集）
+   */
+  /* 移动模型工厂：复刻 doMove 的单步落点语义（冰面滑行→传送门→箭头推动链）。
+   * blockGates=true 时栅栏门视为墙（用于"不充能能否到达"校验）。 */
+  function makeMovement(level, blockGates) {
+    const { w, h, grid, meta } = level;
+    const idx = (x, y) => y * w + x;
+    const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? T.WALL : grid[idx(x, y)];
+    const gateOpen = (x, y) => {
+      if (blockGates) return false;
+      const g = (level.gates || []).find((gt) => gt.x === x && gt.y === y);
+      return !!(g && g.open);
+    };
+    // 初始移动目标：玩家可站上（出口可站；相位/门按可等待/可开启处理）
+    const standable = (x, y) => {
+      const t = at(x, y);
+      if (t === T.WALL) return false;
+      if (t === T.GATE && blockGates) return false;
+      return true;
+    };
+    // 推动落点校验（镜像 enemyCanEnter：出口/相位/关门/玩家占位均不可）
+    const pushEnter = (x, y, px, py) => {
+      const t = at(x, y);
+      if (t === T.WALL || t === T.PHASE || t === T.EXIT) return false;
+      if (t === T.GATE && !gateOpen(x, y)) return false;
+      if (x === px && y === py) return false;
+      return true;
+    };
+    const pushSafe = (x, y, px, py) => {
+      let free = 0;
+      for (const [dx, dy] of DIRS) if (pushEnter(x + dx, y + dy, px, py)) free++;
+      return free >= 2;
+    };
+    // 从 (cx,cy) 朝 (dx,dy) 行动一回合的最终落点；null = 不移动（撞墙等）
+    const land = (cx, cy, dx, dy) => {
+      const nx = cx + dx, ny = cy + dy;
+      if (!standable(nx, ny)) return null;
+      let x = nx, y = ny, guard = 0;
+      while (guard++ < 40) { // 冰面滑行：遇墙/相位/出口即停
+        if (at(x, y) !== T.ICE) break;
+        const tx = x + dx, ty = y + dy;
+        const tt = at(tx, ty);
+        if (tt === T.WALL || tt === T.PHASE || tt === T.EXIT) break;
+        if (tt === T.GATE && !gateOpen(tx, ty)) break;
+        x = tx; y = ty;
+      }
+      const m0 = meta[idx(x, y)]; // 传送门
+      if (m0 && m0.pair && at(x, y) === T.PORTAL) { x = m0.pair[0]; y = m0.pair[1]; }
+      for (let i = 0; i < 3; i++) { // 箭头推动链（占位于当前格）
+        const m = meta[idx(x, y)];
+        if (!m || !m.dir || at(x, y) !== T.ARROW) break;
+        const ax = x + m.dir[0], ay = y + m.dir[1];
+        if (!pushEnter(ax, ay, x, y) || !pushSafe(ax, ay, x, y)) break;
+        x = ax; y = ay;
+      }
+      return [x, y];
+    };
+    return { w, h, idx, standable, land };
+  }
+
+  function realBFS(level, sx, sy, blockGates) {
+    const mv = makeMovement(level, blockGates);
+    const { w, h, idx, land } = mv;
+    const seen = new Uint8Array(w * h);
+    const q = [[sx, sy]];
+    seen[idx(sx, sy)] = 1;
+    while (q.length) {
+      const [x, y] = q.pop();
+      for (const [dx, dy] of DIRS) {
+        const l = land(x, y, dx, dy);
+        if (!l) continue;
+        const k = idx(l[0], l[1]);
+        if (seen[k]) continue;
+        seen[k] = 1;
+        q.push(l);
+      }
+    }
+    return seen;
+  }
+
+  /* 反向可达集合：能到达 (tx,ty) 的格子（推动语义，反图 BFS）。
+   * "充能后能否从板处回来"一类校验用——比对每个候选各跑一次 realBFS
+   * 快一个数量级（一次全图 land 扫描 + 一次反 BFS）。 */
+  function backSet(level, tx, ty, blockGates) {
+    const mv = makeMovement(level, blockGates);
+    const { w, h, idx, standable, land } = mv;
+    const preds = new Map();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!standable(x, y)) continue;
+      for (const [dx, dy] of DIRS) {
+        const l = land(x, y, dx, dy);
+        if (!l) continue;
+        const k = idx(l[0], l[1]);
+        let arr = preds.get(k);
+        if (!arr) { arr = []; preds.set(k, arr); }
+        arr.push(idx(x, y));
+      }
+    }
+    const seen = new Uint8Array(w * h);
+    const start = idx(tx, ty);
+    seen[start] = 1;
+    const q = [start];
+    while (q.length) {
+      const n = q.pop();
+      const ps = preds.get(n);
+      if (!ps) continue;
+      for (const p of ps) if (!seen[p]) { seen[p] = 1; q.push(p); }
+    }
+    return seen;
+  }
+
+  /* POI 互通校验：在推动语义下，是否存在收集顺序使
+   * 出生点 → 全部碎片（+ BOSS 层先击杀 BOSS）→ 出口 均可达。
+   * 单向阀软锁的充分检测：玩家被泄进无法返回的区域后必有无解顺序。 */
+  function poiSolvable(level) {
+    const shards = (level.shards || []).map((s) => ({ x: s.x, y: s.y }));
+    const boss = (level.enemies || []).find((e) => e.boss);
+    const M = shards.length + (boss ? 1 : 0); // 必经点数（碎片 + BOSS）
+    const pois = [level.spawn, ...shards];
+    if (boss) pois.push({ x: boss.x, y: boss.y });
+    pois.push(level.exit);
+    const n = pois.length, W = level.w;
+    const seenAll = [];
+    for (let i = 0; i < n; i++) seenAll.push(realBFS(level, pois[i].x, pois[i].y));
+    const R = (i, j) => seenAll[i][pois[j].y * W + pois[j].x];
+    const EXIT = n - 1;
+    const FULL = (1 << M) - 1;
+    const memo = new Map();
+    // DFS + 记忆化：当前在节点 cur，已收集 mask，能否走完全程
+    const dfs = (cur, mask) => {
+      if (mask === FULL) return R(cur, EXIT);
+      const key = cur * (FULL + 1) + mask;
+      if (memo.has(key)) return memo.get(key);
+      let ok = false;
+      for (let b = 0; b < M && !ok; b++) {
+        if (mask & (1 << b)) continue;
+        if (R(cur, 1 + b)) ok = dfs(1 + b, mask | (1 << b));
+      }
+      memo.set(key, ok);
+      return ok;
+    };
+    return M === 0 ? R(0, EXIT) : dfs(0, 0);
+  }
+
   /* ---------------- 纯几何泛洪（无视传送门/滑行）——用于地图体量检查 ----------------
    * blockGates=true 时把栅栏门视为墙：用于验证"不经过任何门可达"的区域（防软锁关键）
    */
@@ -206,7 +361,7 @@
   }
 
   /* ---------------- 群系机制铺装 ---------------- */
-  function paintBiome(rng, level) {
+  function paintBiome(rng, level, noArrows) {
     const { w, h, grid, biome } = level;
     const idx = (x, y) => y * w + x;
     const at = (x, y) => grid[idx(x, y)];
@@ -251,7 +406,7 @@
     if (mech.thinice) for (let i = 0; i < 2; i++) blob((x, y) => { if (at(x, y) === T.FLOOR) set(x, y, T.THIN); });
     if (mech.lava) for (let i = 0; i < 3; i++) blob((x, y) => { if (at(x, y) === T.FLOOR) set(x, y, T.LAVA); });
     if (mech.crumble) for (let i = 0; i < 10; i++) { const [x, y] = floors[Math.floor(rng() * floors.length)]; if (at(x, y) === T.FLOOR) set(x, y, T.RUBBLE); }
-    if (mech.arrows) {
+    if (mech.arrows && !noArrows) {
       const nearDeadEnd = (x, y) => DIRS.some(([dx, dy]) => deadEnd(level, x + dx, y + dy));
       for (let i = 0; i < 8; i++) {
         const [x, y] = floors[Math.floor(rng() * floors.length)];
@@ -321,10 +476,21 @@
       }
     }
     // 兜底：返回最优努力层（测试保证其仍 ≥50；理论极少触发）
+    // 若 6 次尝试全部被软锁校验拒绝（理论概率≈0），用无箭头布局再试一次——
+    // 箭头是唯一能制造静态单向阀的地形，去掉后互通性由其余地形保证
+    if (!bestLevel) {
+      // 注意：w/h 是 while 内的块级变量，这里要独立重算（lint no-undef 实测抓到过）
+      const bonus = biome.id === 'frost' ? 6 : 0;
+      const safeW = Math.min(46, 26 + Math.floor(floor * 0.22)) + 20 + bonus;
+      const safeH = Math.min(28, 16 + Math.floor(floor * 0.14)) + 4 + (biome.id === 'frost' ? 2 : 0);
+      const safe = buildOnce(rng, floor, biome, isBoss, safeW, safeH, target, true);
+      if (safe) { bestLevel = safe; }
+      else if (DEBUG) console.error(`[gen] seed=${seed} F${floor} 无箭头兜底也失败（极端情况）`);
+    }
     return bestLevel;
   }
 
-  function buildOnce(rng, floor, biome, isBoss, w, h, target) {
+  function buildOnce(rng, floor, biome, isBoss, w, h, target, noArrows) {
     const DEBUG = typeof process !== 'undefined' && process.env && process.env.ECHO_GEN_DEBUG;
     const dbg = (msg) => { if (DEBUG) console.error('    [build] ' + msg); };
     const idx = (x, y) => y * w + x;
@@ -338,7 +504,7 @@
     if (isBoss) { const r = carveArena(w, h); grid = r.grid; rooms = r.rooms; }
     else { const r = carveMap(rng, w, h, 5 + Math.floor(rng() * 4) + Math.floor(floor / 30)); grid = r.grid; rooms = r.rooms; }
     level.grid = grid;
-    paintBiome(rng, level);
+    paintBiome(rng, level, noArrows);
 
     /* ---- 出生点与出口 ---- */
     const floorsAll = [];
@@ -450,7 +616,18 @@
           level.gates.pop();
           continue;
         }
-        const [px, py] = pf[Math.floor(rng() * pf.length)];
+        // 单向阀防护（几何泛洪看不见）：板必须在真实推动语义下与出生点互通——
+        // 无门可达（去）且充能后能回来（回）。seed 777 F24 实测教训：板被放进
+        // 只能进的箭头水槽，玩家充完能就被永久关死。反图 BFS 一次算完"能回来"集合。
+        const fwd = realBFS(level, spawn[0], spawn[1], true);
+        const back = backSet(level, spawn[0], spawn[1], false);
+        const safePf = pf.filter(([x, y]) => fwd[idx(x, y)] && back[idx(x, y)]);
+        if (!safePf.length) {
+          grid[idx(gx, gy)] = T.FLOOR;
+          level.gates.pop();
+          continue;
+        }
+        const [px, py] = safePf[Math.floor(rng() * safePf.length)];
         grid[idx(px, py)] = T.PLATE;
         level.plates.push({ x: px, y: py, group: g });
       }
@@ -504,6 +681,8 @@
       const boss = DATA.bossOf(floor);
       level.enemies.push({ type: 'boss:' + boss.id, x: w >> 1, y: 4, boss: true });
     }
+    /* ---- 软锁防护（真实推动语义）：不存在合法收集顺序 → 注销重生成 ---- */
+    if (!poiSolvable(level)) { dbg('poi 软锁（单向阀/不可达），重新生成'); return null; }
     return level;
   }
 

@@ -19,6 +19,18 @@ jobs:
       - run: npm install
       - run: npm test
 
+  lint:
+    name: ESLint (0 error 门槛)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --ignore-scripts
+      - run: npm run lint
+
   smoke:
     name: 浏览器冒烟 (PWA/SW/渲染)
     runs-on: ubuntu-latest

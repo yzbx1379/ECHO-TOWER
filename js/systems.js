@@ -350,7 +350,7 @@
       }
       if ((t === T.FLOOR || t === T.RUBBLE) && this.spikeActiveAt(x, y)) {
         if (isPlayer) this.damagePlayer(1, 'spike', null, true);
-        else if (who && who.alive !== undefined) this.shatterEcho(who); // 回声踩刺
+        else if (who && who.alive !== undefined) this.shatterEcho(who, 'spike'); // 回声踩刺
       }
     }
 
@@ -409,7 +409,7 @@
       }
       const eco = this.echo;
       if (eco && eco.alive && eco.spawned && eco.x === tx && eco.y === ty) {
-        this.shatterEcho(eco);
+        this.shatterEcho(eco, 'playerAttack');
         this.endTurn('w');
         return true;
       }
@@ -523,6 +523,32 @@
           }
         }
       }
+      // 双子复活驱动（全局，不依赖个体 AI 循环）
+      for (const e of this.enemies) {
+        if (e.dead || !e.boss || e.bossId !== 'gemini') continue;
+        const p2 = e.st.partner;
+        if (!p2 || !p2.dead) continue;
+        if (p2.st.revivesLeft == null) p2.st.revivesLeft = 1;
+        if (p2.st.reviveQueued == null && p2.st.revivesLeft > 0) p2.st.reviveQueued = 3;
+        if (p2.st.reviveQueued != null) {
+          p2.st.reviveQueued--;
+          if (p2.st.reviveQueued <= 0) {
+            if (p2.st.revivesLeft > 0) {
+              p2.st.revivesLeft -= 1;
+              p2.dead = false;
+              p2.hp = Math.ceil(p2.maxHp / 2);
+              const spots = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+              for (const [dx, dy] of spots) {
+                if (this.enemyCanEnter(p2, e.x + dx, e.y + dy)) { p2.x = e.x + dx; p2.y = e.y + dy; break; }
+              }
+              p2.px = p2.x; p2.py = p2.y;
+              this.fx.burst(p2.x, p2.y, '#8fe388', 20);
+              this.fx.toast('双子重新站起（半血）——它只剩一次机会了！');
+            }
+            p2.st.reviveQueued = null;
+          }
+        }
+      }
       // 吐纳回气
       if (this.stats.regenN && this.turnCount % this.stats.regenN === 0 && p.hp < p.maxHp) {
         p.hp = Math.min(p.maxHp, p.hp + 1);
@@ -599,6 +625,13 @@
         for (const e of this.enemies) {
           if (!e.dead && Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) <= 2) this.hurtEnemy(e, 3, '#9adfff');
         }
+        // 脉冲也能击碎周围的回声（主动猎手）
+        if (this.echo && this.echo.alive && this.echo.spawned && Math.max(Math.abs(this.echo.x - p.x), Math.abs(this.echo.y - p.y)) <= 2) {
+          this.shatterEcho(this.echo, 'pulse');
+        }
+        for (const be of this.bossEchoes) {
+          if (!be.dead && be.spawned && Math.max(Math.abs(be.x - p.x), Math.abs(be.y - p.y)) <= 2) this.shatterEcho(be, 'pulse');
+        }
         this.endTurn('w');
         return true;
       }
@@ -666,8 +699,8 @@
           this.fx.toast('一尊倒下了——在它复活前解决另一尊！');
         } else this.onBossDead(e);
       }
-      // 自爆虫临死爆炸
-      if (e.type === 'bomber') this.explode(e.x, e.y, 1, e.dmg, e);
+      // 自爆虫临死爆炸（若已引爆过则跳过，避免双爆）
+      if (e.type === 'bomber' && !e.st.fuseFired) this.explode(e.x, e.y, 1, e.dmg, e);
     }
 
     onBossDead(e) {
@@ -689,6 +722,8 @@
     damagePlayer(n, kind, src, quietFx) {
       const p = this.player;
       if (this.over || n <= 0) return;
+      // 调试无敌：仅 ?debug=1 时由 main.js 置位；正式玩法恒为 undefined，此判定恒不命中
+      if (this.debugInvuln) return;
       if (kind !== 'echo' && kind !== 'water' && this.invulnTurns > 0) return;
       // 蛇之狡诈闪避
       if (this.has('cunning') && this.rng() < 0.10) { this.fx.floatText(p.x, p.y - 0.6, '闪避!', '#59c9a5'); return; }
@@ -758,10 +793,10 @@
             this.damagePlayer(pr.dmg, 'ranged', null); pr.dead = true; continue;
           }
           if (this.echo && this.echo.alive && this.echo.spawned && this.echo.x === cx && this.echo.y === cy) {
-            this.shatterEcho(this.echo); pr.dead = true; continue;
+            this.shatterEcho(this.echo, 'proj'); pr.dead = true; continue;
           }
           for (const be of this.bossEchoes) {
-            if (!be.dead && be.spawned && be.x === cx && be.y === cy) { this.shatterEcho(be); pr.dead = true; }
+            if (!be.dead && be.spawned && be.x === cx && be.y === cy) { this.shatterEcho(be, 'proj'); pr.dead = true; }
           }
         } else {
           const e = this.enemyAt(cx, cy);
@@ -782,7 +817,7 @@
         if (t === T.GATE && !(this.gateAt(x, y) || {}).open) break;
         const p = this.player;
         if (p.x === x && p.y === y) { this.damagePlayer(e.dmg, 'laser', e); }
-        else if (this.echo && this.echo.alive && this.echo.x === x && this.echo.y === y) this.shatterEcho(this.echo);
+        else if (this.echo && this.echo.alive && this.echo.x === x && this.echo.y === y) this.shatterEcho(this.echo, 'laser');
         x += dx; y += dy; len++;
       }
       this.beams.push({ x0: start[0], y0: start[1], x1: x - dx, y1: y - dy, color: '#ff6b4a', life: 1 });
@@ -811,7 +846,7 @@
       const distP = Math.max(Math.abs(p.x - x), Math.abs(p.y - y));
       if (!isPlayerBomb && distP <= radius) this.damagePlayer(Math.ceil(dmg / 2), 'explosion', src);
       if (this.echo && this.echo.alive && this.echo.spawned && Math.max(Math.abs(this.echo.x - x), Math.abs(this.echo.y - y)) <= radius) {
-        this.shatterEcho(this.echo);
+        this.shatterEcho(this.echo, isPlayerBomb ? 'bomb' : 'explode');
       }
     }
 
@@ -845,10 +880,10 @@
           // 推开玩家
           const kx = p.x + dx, ky = p.y + dy;
           if (this.enemyCanEnter(null, kx, ky)) { p.x = kx; p.y = ky; this.enterCellEffects(kx, ky, 'player'); }
-          this.shatterEcho(eco);
+          this.shatterEcho(eco, 'echoWalk');
         } else {
           this.damagePlayer(1, 'echo', null);
-          this.shatterEcho(eco);
+          this.shatterEcho(eco, 'echoWalk');
         }
         return;
       }
@@ -889,15 +924,28 @@
       if (eco.trail.length > 14) eco.trail.shift();
     }
 
-    shatterEcho(eco) {
+    shatterEcho(eco, cause) {
+      // cause: 'playerWalk' (玩家主动走进回声格) / 'playerAttack' (玩家挥击/炸/脉冲) /
+      //        'echoWalk' (回声撞上玩家) / 'spike' (回声自己踩刺) / 'proj' (被投射物击碎) /
+      //        'bomb' / 'explode' / 'swap' / undefined (正常消散)
+      // 主动猎手：玩家主动用动作（挥击/炸弹/时停/脉冲）击碎 → 奖励加倍
+      const activeCauses = ['playerAttack', 'bomb', 'pulse'];
       if (!eco || !eco.alive) return;
       eco.alive = false;
       this.fx.sfx('echoDie');
       this.fx.burst(eco.x, eco.y, '#e4ccff', 24);
-      const base = 4 + Math.floor(this.rng() * 5) + this.stats.echoDust + (this.hasTalent('t_echoxp') ? 6 : 0);
+      let base = 4 + Math.floor(this.rng() * 5) + this.stats.echoDust + (this.hasTalent('t_echoxp') ? 6 : 0);
+      const isPerfectHunter = activeCauses.includes(cause);
+      if (isPerfectHunter) base = Math.round(base * 2);
       const amt = Math.max(1, Math.round(base * (1 + (this.stats.dustMul + (this.classId === 'shadow' ? 25 : 0)) / 100)));
       this.dropPickup(eco.x, eco.y, 'dust', amt);
-      this.fx.floatText(eco.x, eco.y - 0.5, `+${amt}回尘`, '#e4ccff');
+      if (isPerfectHunter) {
+        this.fx.floatText(eco.x, eco.y - 0.5, `完美猎手! +${amt}回尘`, '#ffd700');
+        this.fx.shake(2);
+        this.fx.toast('★ 完美回声猎手：主动击碎，回尘翻倍！');
+      } else {
+        this.fx.floatText(eco.x, eco.y - 0.5, `+${amt}回尘`, '#e4ccff');
+      }
     }
 
     /* ================= 拾取 / 宝箱 / 碎片 ================= */
@@ -963,6 +1011,7 @@
     /* ================= 楼层流程 ================= */
     buildLevel() {
       this.level = G.generateFloor(this.seed, this.floor, {});
+      this.nextUid = 1; // 实例级 uid：每层从 1 起，避免跨局/跨层污染（uid%2 决定敌人冷却）
       this.enemies = [];
       for (const spec of this.level.enemies) {
         if (spec.type === 'boss:gemini') {
@@ -997,6 +1046,8 @@
     nextFloor() {
       const prevRec = this.recording.slice();
       if (this.has('belt')) this.healPlayer(1);
+      // 稳健奖励：每通关一层固定给 dustPerFloor 回尘（不依赖击碎回声）
+      this.dust += D.BAL.dustPerFloor; this.runStats.dustEarned += D.BAL.dustPerFloor;
       this.floor++;
       this.buildLevel();
       this.perFloorReset();
@@ -1020,6 +1071,28 @@
         this.fx.onMusicIntensity(2);
       } else this.fx.onMusicIntensity(1);
       this.autosave();
+    }
+
+    /* 调试跳层：仅供 ?debug=1 调用。与 nextFloor 的区别是不发放回尘、不触发
+     * 天赋/商店/BOSS 提示，只重建目标层；并把运行时随机流重置为该层规范种子，
+     * 保证「同一 seed + 同一层号 → 同一布局与敌人」，便于复现问题。 */
+    debugJumpFloor(delta) {
+      const target = Math.max(1, Math.min(100, this.floor + delta));
+      if (target === this.floor) return false;
+      this.floor = target;
+      this.rng = C.mulberry32((this.seed ^ (this.floor * 2654435761)) >>> 0);
+      this.recording = [];
+      this.lastRecording = [];
+      this.echo = null;
+      this.bossEchoes = [];
+      this.over = false; this.victory = false;
+      this.buildLevel();
+      this.perFloorReset();
+      this.fx.onMusicBiome(this.level.biome);
+      this.fx.onMusicIntensity(this.level.isBoss ? 2 : 1);
+      this.fx.onFloorStart(this.level);
+      this.autosave();
+      return true;
     }
 
     /* ================= 成长 ================= */
@@ -1105,7 +1178,7 @@
         }
         case 'shop_draft': this.queueDraft('命运重铸'); break;
         case 'shop_purify':
-          if (this.echo && this.echo.alive) { this.shatterEcho(this.echo); this.echo = null; }
+          if (this.echo && this.echo.alive) { this.shatterEcho(this.echo, 'purify'); this.echo = null; }
           else this.gold += item.price, this.fx.toast('当前没有回声可净化');
           break;
       }
@@ -1125,15 +1198,20 @@
       this.fx.toast('⏳ 时之沙漏把你拉回了过去！');
       this.fx.sfx('swap');
     }
-    ringSlam(cx, cy, r, dmg, color) {
+    ringSlam(cx, cy, r, dmg, color, delay) {
+      // 视觉环（立即画出，不造成伤害）
       for (let a = 0; a < 32; a++) {
         const px = cx + Math.round(Math.cos(a / 5) * r), py = cy + Math.round(Math.sin(a / 5) * r);
-        if (this.inBounds(px, py)) this.fx.burst(px, py, color, 3);
+        if (this.inBounds(px, py)) this.fx.flashTile(px, py, color || '#ff7847');
       }
-      const p = this.player;
-      const d = Math.round(Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2));
-      if (Math.abs(d - r) <= 0) this.damagePlayer(dmg, 'slam', null);
       this.fx.shake(3);
+      // 预警：把环上每个在界内的格子加入 pendingSlams（delay 回合后结算伤害），避免"突然掉血"
+      const at = this.turnCount + (delay == null ? 1 : delay);
+      for (let a = 0; a < 32; a++) {
+        const px = cx + Math.round(Math.cos(a / 5) * r), py = cy + Math.round(Math.sin(a / 5) * r);
+        if (!this.inBounds(px, py)) continue;
+        this.pendingSlams.push({ x: px, y: py, dmg, at, color: color || '#ff7847' });
+      }
     }
     telegraphSlam(x, y, dmg, color) {
       this.pendingSlams.push({ x, y, dmg, at: this.turnCount + 1, color });
@@ -1158,13 +1236,24 @@
       this.beams.push({ x0: e.x, y0: e.y, x1: x, y1: y, color: '#ff5edb', life: 1 });
     }
     arrowStorm(bx, by, radius) {
+      // 全场统一方向（每次施放重掷）。原先每格随机方向会形成「自环吸引子」：
+      // 玩家踩进箭头场后四个方向的推链都把自己送回原格，可达域塌缩为 1 格，
+      // 碎片收齐也走不到出口 → 永久卡死（seed 20250101 F20 实测）。
+      // 单向流场里沿箭头方向必能离开该格，且更可预判（符合「敌方完全确定」的设计）。
+      const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(this.rng() * 4)];
+      for (let i = 0; i < this.level.grid.length; i++) {
+        if (this.level.grid[i] !== T.ARROW) continue;
+        const m = this.level.meta[i];
+        if (m) m.dir = dir; else this.level.meta[i] = { dir };
+        this.dirtyCells.add(i);
+      }
       let placed = 0;
       for (let t = 0; t < 30 && placed < radius * 3; t++) {
         const x = bx + Math.floor(this.rng() * (radius * 2 + 1)) - radius;
         const y = by + Math.floor(this.rng() * (radius * 2 + 1)) - radius;
         if (!this.inBounds(x, y) || this.tileAt(x, y) !== T.FLOOR) continue;
         this.level.grid[this.idx(x, y)] = T.ARROW; this.dirtyCells.add(this.idx(x, y));
-        this.level.meta[this.idx(x, y)] = { dir: [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(this.rng() * 4)] };
+        this.level.meta[this.idx(x, y)] = { dir };
         placed++;
       }
       this.fx.toast('🌀 发条暴君扭转了地砖！');

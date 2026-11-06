@@ -1,6 +1,6 @@
 # 回声之塔 · 优化执行计划
 
-> 依据:对当前代码(11 个 js + css + 4 套测试)的审阅。
+> 依据:对当前代码(10 个 js + css + 6 套测试)的审阅；2026-10-24 全量复查、2026-11-05 收尾同步。
 > 原则:尊重项目"零依赖、纯 Canvas、双击即玩、GitHub Pages 部署"的设计哲学,**不引入打包工具/框架**。
 > 执行方式:自上而下逐项实施,每项完成后立即跑测试套件回归,并在本文件更新状态(⏳待办 / 🔄进行中 / ✅完成 / ⏸️阻塞)。
 
@@ -9,14 +9,19 @@
 ## 测试基线(每项完成后运行)
 
 ```bash
-npm test                 # 一键跑下面三项
-#  = node test/gen.test.cjs   生成器 12956 项断言(可解性 + 每层≥50步)
-#  = node test/sim.test.cjs   机器人真实爬塔过 BOSS(F10双子→F11+)
-#  = node test/dom-stub.cjs   UI 装配冒烟(标题→选职→HUD→天赋→商店→结算)
-node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行权限)
+npm test                          # 一键跑下面全部 Node 测试
+#  = node test/gen.test.cjs             生成器 12950 项断言(可解性 + 每层≥50步)
+#  = node test/sim.test.cjs             端到端机器人：3 种子通关 F100 → F101
+#  = node test/dom-stub.cjs             UI 冒烟 + 调试关闭 + 色盲组号分支
+#  = node test/dom-stub.cjs --debug      调试模式(localStorage 通路)
+#  = node test/dom-stub.cjs --url-debug  调试模式(URL ?debug=1 通路)
+#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(53 项)
+npm run lint                      # ESLint(0 error 门槛，已纳入 CI)
+node test/smoke.cjs               # Playwright 真浏览器截图冒烟(需本机执行权限)
 ```
 
-回归标准:`gen.test.cjs` 与 `sim.test.cjs` 必须全绿;`dom-stub.cjs` 不得因本次改动新增失败输出;`smoke.cjs` 不得在沙箱外崩。
+回归标准:`gen.test.cjs` / `sim.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` 0 error;`smoke.cjs` 不得在沙箱外崩。
+> `format:check` **不作为门禁**:全项目 16 个文件仍不符合 Prettier 风格,全量 `--write` 会产生数千行重排 diff,本轮决定降级为可选工具(详见任务 9)。
 
 ---
 
@@ -32,10 +37,10 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
 | 6   | PWA(manifest + service worker)     | 🥇     | ✅   | 中   |
 | 7   | 静态地形离屏 Canvas 缓存            | 🥈     | ✅   | 中   |
 | 8   | 首层生成 Web Worker                | 🥈     | ⏸️   | 中   |
-| 9   | ESLint + Prettier 工程化           | 🥈     | ✅   | 低   |
+| 9   | ESLint + Prettier 工程化           | 🥈     | ✅ ESLint / ⏸️ Prettier | 低   |
 | 10  | 生成器 `dSpawn` 复用(小优化)       | 🥉     | ✅   | 低   |
-| 11  | 游戏内调试模式(?debug=1)          | 🥉     | ⏳   | 低   |
-| 12  | 色盲友好(形状区分)                | 🥉     | ⏳   | 中   |
+| 11  | 游戏内调试模式(?debug=1)          | 🥉     | ✅   | 低   |
+| 12  | 色盲友好(形状区分)                | 🥉     | ✅   | 中   |
 | 13  | heldKarp 改 TypedArray(可选)       | 🥉     | ⏳   | 低   |
 | 14  | systems.js 拆分(可选)             | 🥉     | ⏳   | 中   |
 
@@ -124,6 +129,7 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
   - 可选:`.github/workflows/ci.yml` 跑 `npm test` + lint
 - **验收**:`npm run lint` 无 error;`npm run format --check` 通过(或先 `format` 一次统一)。
 - **状态**:✅ 配置完成(2026-08-23)。新增 `.eslintrc.cjs`(8 条宽松规则:no-undef error、no-unused-vars/no-fallthrough/eqeqeq warn;test/*.cjs 用 node env;忽略 .pw-browsers/shot_*.png)、`.prettierrc`(printWidth 120/semi false/singleQuote/trailingComma all,贴近现有风格)、`.prettierignore`;package.json 加 `lint`/`lint:fix`/`format`/`format:check` scripts + eslint/prettier devDeps。配置语法已验证(8 rules 解析正常)。**lint/format 实际运行待用户本地 `npm install`**(npm 在此沙箱被执行策略禁用)。CI workflow 已加(`.github/workflows/ci.yml`:push/PR 到 main 触发,两个并行 job——Node 测试 + Playwright 浏览器冒烟;lint 未纳入 CI 因配置尚未验证通过,待本地跑通后再加)。
+- **状态更正(2026-10-24 实跑)**:原"配置语法已验证"结论不成立——ESLint 首次实跑即报 `no-empty` 规则 schema 非法(`allowStatementCursors` 非合法字段),已改为 `allowEmptyCatch`;`test/**/*.cjs` override 误设 `browser:false` 导致 window/document 误报,已改回 `browser:true`。修完后 `npx eslint js/ test/` = **0 error / 27 warning**(warning 全为存量 unused-vars 与 ui.js 的 `close` 前置引用)。`.github/workflows/ci.yml` 新增第三个并行 `lint` job(`npm run lint` 作 0-error 门禁)。**Prettier 如实降级**:`prettier --check "js/**/*.js" "test/**/*.cjs"` 报 16 个文件不符合,全量 `--write` 会产生数千行重排 diff 且可能引发冲突,决定不执行;`format`/`format:check` 保留为本地可选命令,**不纳入 CI、不作为合并门禁**。
 
 ### 10. 生成器 `dSpawn` 复用
 - **目标**:消除 `buildOnce` 40 次试探里对 `spawn` 重复的 stateBFS。
@@ -135,13 +141,13 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
 - **目标**:开发/调参可用,`?debug=1` 或 `localStorage.echoTower.debug=1` 开启。
 - **改动**:`js/main.js` 读 flag → 暴露跳层(`[`/`]`)、无敌、显示回声录制、显示 OPT vs 实际步数;`render.js` 调试叠层。
 - **验收**:flag 关闭时行为零变化;开启时调试叠层显示,`smoke.cjs` 正常。
-- **状态**:⏳
+- **状态**:✅ 完成(2026-11-05)。`js/main.js` 顶层 `debugEnabled()` 读 `?debug=1` 或 `localStorage.echoTower.debug=1`,全程 `typeof`/try-catch 保护;**flag 关闭时不注册 keydown、不挂 `window.__echoDebug`、不调用叠层**,正式玩法路径零变化。`js/systems.js` 加 `damagePlayer` 无敌早退 + `debugJumpFloor(delta)`(钳制 F1–F100、重置为该层规范随机种子、清录像/回声、不发回尘与奖励)。`js/render.js` 加 `drawDebugOverlay`(屏幕空间叠层:F/seed/坐标、OPT vs 实际步数、录像帧数/回声、碎片/出口锁/HP、无敌状态)。按键 `[` `]` 跳层、`I` 无敌;另暴露 `window.__echoDebug` 供控制台。`test/dom-stub.cjs` 新增 `--debug` / `--url-debug` 两种启动模式,覆盖两条 flag 通路、API 与真实 keydown、边界钳制、无敌伤害、叠层绘制,以及 flag 关闭时零副作用。回归:dom-stub 31→36 项(常规)/48 项(调试),gen 12950、sim 3 种子通关、static 53 项、lint 0 error 全绿。**2026-11-06 补真浏览器实测**:Chromium headless(1280×800) 打开 `?debug=1`,`__echoDebug.state` 由 `F1/OPT=56/invuln=OFF` 经 `]`+`I` 变为 `F2/OPT=53/invuln=ON`,控制台零错误;截图目视确认叠层 5 行完整、位于左下空白区不遮挡地图/HUD/小地图。
 
 ### 12. 色盲友好(形状区分)
 - **目标**:不只靠色相区分碎片/出口/危险。
 - **改动**:`js/data.js` 群系调色补对比度;`render.js` 给关键实体加形状/图案(如出口加门框、碎片加菱形描边)。
 - **验收**:灰度模式下仍可辨识关键元素。
-- **状态**:⏳
+- **状态**:✅ 完成(2026-11-05,按实际缺口收敛)。复查结论:碎片(菱形)、宝箱(横箱)、锁住的出口(圆+叉)、栅栏门(竖栏+⚡充能)、压力板(圆环)、箭头(三角)、传送门(圆)、相位墙(虚线框)、尖刺(锯齿) **本来就有形状区分**,不需要再堆图形。真正只依赖色相的是 **门 group ↔ 压力板 group 的配对**(4 种组色,无其它线索)。因此在两处叠加一致的组号数字徽记(`render.js` 新增并导出 `groupMark(group)` → 1–4,按 4 取模稳定),组色降为辅助线索;未改动其它渲染路径。`test/dom-stub.cjs` 断言 4 组号互异/为纯数字/取模稳定,并强制把 GATE/PLATE 注入某层后跑一次 `render()`,保证新增分支不抛错。**2026-11-06 补真浏览器截图**:同一张 F2 截图中可见两块压力板中心分别显示 `1`/`2`、右侧栅栏门左上角显示同组 `2` 徽记,数字与组色一一对应、无重叠。**灰度滤镜下的辨识度仍未单独实测**,按口径记为"代码检测 + 常规配色目视通过,灰度待人工复检",不写作"达标"。
 
 ### 13. heldKarp 改 TypedArray(可选)
 - **目标**:学术优化,Map→Float64Array。K≤7 收益极小。
@@ -150,6 +156,28 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
 ### 14. systems.js 拆分(可选)
 - **目标**:52KB 单文件拆 4-5 个。仅在后续大改时做。
 - **状态**:⏳
+
+---
+
+## 2026-10-24 全量复查追加项(原 14 项之外；2026-11-05 完成收尾回归)
+
+> 触发:用户要求"先确认项目是最新的"再提改进建议。本地 HEAD `63ad2fe` 经 GitHub API 校验与 `origin/main` 最新 sha 一致(`git fetch` 因 schannel TLS 握手失败,改用 API);工作区原有 4 个 WIP 文件保留未动。
+
+| 项 | 发现 / 结论 | 处置 |
+| --- | --- | --- |
+| 🔴 英文 BOSS 名静默回退中文 | `data.js` 的 `_EN.bosses` 用了 AI 名 `frost`/`eye`,而实体 id 是 `frostheart`/`voideye`,注入 `find()` 命中失败 | key 改为 `frostheart`/`voideye`;7 张表 nameE/descE/hintE 全覆盖校验通过 |
+| 🔴 `.workbuddy/` 未忽略 | 未跟踪目录有误提交进公开仓库风险 | `.gitignore` 加 `.workbuddy/`,`git check-ignore -v` 验证命中 |
+| 🔴 端到端只测到 F12 | F13–F100 与后 8 个 BOSS 零覆盖 | `sim.test.cjs` 目标改 F100,3 种子全部通关 F101(15886/16938/15348 回合),连跑两次结果完全一致 |
+| 🔴 `sw.js` 手写 15 项 ASSETS | 新增资源漏一项即离线白屏 | 新增 `test/static.test.cjs` 双向比对 index.html 引用与 ASSETS、manifest 图标;53/53 通过,负例自检(注入 `js/ghost.js`)确证可抓漏 |
+| 🟡 lint 配置从未实跑 | 见任务 9 状态更正 | 修 schema + env,0 error,新增 CI `lint` job |
+| 🔴 生成器箭头单向阀软锁 | 纯几何泛洪不建模推动语义,压力板可能被放进"能进不能出"区域(seed 777 F24) | `gen.js` 新增 `makeMovement`/`realBFS`/`backSet`/`poiSolvable`,压力板候选双向互通过滤、生成末尾拒绝无解层、极端情况无箭头兜底;平均耗时 19.5ms→**2.8ms/层** |
+| 🔴 同进程多 seed 结果互相污染 | `entities.js` 模块级 `UID` 递增,而 `systems.js` 用 `(uid % 2)+1` 决定敌人冷却 | 改为实例级 `game.nextUid`,每层重置为 1 |
+| 🔴 F20 运行时自环卡死 | `arrowStorm` 给每格随机方向,可形成吸引子把玩家可达域压成 1 格 | 每次施放全场箭头统一方向,新箭头沿用该方向 |
+| 🔴 模拟机器人与真实 `doMove` 不一致 | 箭头推动链缺 `enemyCanEnter`/`arrowPushSafe`;碎片可在 `visited` 途经格被拾取,机器人只判最终落点 | `computeLanding` 精确镜像推动语义并输出途经格;新增 `viaPath`/`reachSet`/`orderExists`/`pickSafeShard` |
+| 🟡 `gen.js` 兜底分支 `w/h` 未定义 | 极端情况会抛 `ReferenceError` | ESLint `no-undef` 提前抓到,改为独立重算 `safeW`/`safeH` |
+| 🟡 `package-lock.json` 陈旧 | 原文件 `"name": "geom"` 且无 devDependencies,与本仓库无关 | `npm install` 重建为 `echo-tower` + 3 个 devDeps(103 包);详见 README 工程说明 |
+
+> 口径备注(2026-11-06 更新):本机补装 Playwright `chromium_headless_shell-1234`(114.5 MiB)后,`node test/smoke.cjs` 已跑通 **11/11、控制台零错误**;顺带修复 SW 断言日志——原写法 `page.evaluate(() => getRegistration())` 跨进程序列化丢失原型属性,日志恒显示 `undefined`,改为直接回传 `r.scope`,现在输出 `http://localhost:8765/` 可核验。**灰度滤镜 / 多分辨率 / 触屏仍未实测**,整体记作"代码检测 + 常规配色真浏览器目视通过,灰度待人工复检",不写作"达标"。
 
 ---
 
@@ -172,3 +200,11 @@ node test/smoke.cjs      # Playwright 真浏览器截图冒烟(需本机执行�
 | 2026-08-23 | 🧪 render 脏格回归测试(dom-stub 26→29 项),填补 render.js 零测试盲区 |
 | 2026-08-23 | 🚀 GitHub Actions CI:Node 测试 + Playwright 冒烟(含 SW/manifest 断言) |
 | 2026-08-23 | 🏁 核心 1-10 完成(8 推迟);11-14 未实施,plan 记录在案,可随时重启 |
+| 2026-10-24 | 🔎 全量复查:确认 HEAD 与远端一致;列出 i18n / 测试覆盖 / SW 清单 / lint / .workbuddy 等 6 类改进点 |
+| 2026-10-24 | ✅ 追加项 1–5:BOSS 英文 key、.gitignore、sim 延伸至 F100、static.test.cjs、lint 实跑并入 CI |
+| 2026-10-24 | 🐛 F100 模拟连带修复 4 个真 bug:生成器单向阀软锁、模块级 UID 污染、arrowStorm 自环、机器人移动模型错位 |
+| 2026-10-24 | ⏸️ Prettier 降级为可选工具(16 文件不符合,不做全量重排);8/13/14 维持原状态 |
+| 2026-11-05 | ✅ 任务 11:调试模式 `?debug=1`(跳层/无敌/OPT 叠层),dom-stub 三种模式回归 |
+| 2026-11-05 | ✅ 任务 12:门/压力板组号标记(色盲友好),收敛范围为真实缺口 |
+| 2026-11-05 | 📝 README/plan 同步、package-lock 规范化、全量回归(gen 12950 + sim 3 种子 + dom-stub 36/48/48 + static 53 + lint 0 error) |
+| 2026-11-06 | 🧪 补装 Playwright headless shell,真浏览器冒烟 11/11 + 控制台零错误;修 SW 断言日志(回传 `r.scope`);`?debug=1` 跳层/无敌与组号徽记截图目视通过 |

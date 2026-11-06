@@ -1,9 +1,14 @@
 /* 《回声之塔》DOM 桩冒烟测试 —— 无浏览器环境下验证 UI 装配与主循环
  * 用最小 DOM/Canvas 存根加载全部脚本，模拟点击标题→选职业→按键移动。
  * 运行： node test/dom-stub.cjs
+ *       node test/dom-stub.cjs --debug      （模拟 localStorage.echoTower.debug=1）
+ *       node test/dom-stub.cjs --url-debug  （模拟 URL ?debug=1）
  */
 'use strict';
 const path = require('path');
+/* 调试开关在脚本加载期即被 main.js 读取，因此必须在 require 之前决定 */
+const URL_DEBUG = process.argv.includes('--url-debug');
+const STUB_DEBUG = URL_DEBUG || process.argv.includes('--debug');
 
 /* ---------------- 最小 DOM 存根 ---------------- */
 function makeClassList() {
@@ -118,6 +123,8 @@ global.self = global;
 global.document = documentStub;
 try { global.navigator = { userAgent: 'stub' }; } catch (e) { /* Node22 只读 */ }
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
+global.location = { search: URL_DEBUG ? '?debug=1' : '' };
+if (STUB_DEBUG && !URL_DEBUG) localStorage.setItem('echoTower.debug', '1');
 /* Base64 编解码：Node 16+ 已全局内置，老环境兜底 */
 global.btoa = global.btoa || ((s) => Buffer.from(s, 'binary').toString('base64'));
 global.atob = global.atob || ((s) => Buffer.from(s, 'base64').toString('binary'));
@@ -292,6 +299,69 @@ window.EchoLang.set('zh');
   // 第二次 render：命中缓存，应消费脏格并清空
   window.EchoRender.render(ctx, game, canvas, 0.1)
   ok(game.dirtyCells.size === 0, `脏格已消费 (${game.dirtyCells.size} 剩余)`)
+}
+
+/* 色盲友好：门/板组号不依赖色相，且强制渲染 GATE/PLATE 分支不抛错 */
+{
+  const R = window.EchoRender, T = window.EchoGen.T;
+  const gm = R.groupMark;
+  ok(typeof gm === 'function', 'groupMark 已导出');
+  const marks = [0, 1, 2, 3].map(gm);
+  ok(new Set(marks).size === 4, `4 个分组的组号互不相同 (${marks.join('/')})`);
+  ok(marks.every((m) => /^[1-4]$/.test(m)), '组号为 1-4 纯数字（灰度可读）');
+  ok(gm(0) === gm(4) && gm(2) === gm(-2), '组号按 4 取模稳定');
+  const cg = window.EchoGame.create({ seed: 4242, floor: 1, classId: 'knight' });
+  const L = cg.level;
+  const a = L.grid.findIndex((t) => t === T.FLOOR);
+  const b = L.grid.findIndex((t, i) => i > a && t === T.FLOOR);
+  L.grid[a] = T.GATE;
+  L.gates.push({ x: a % L.w, y: Math.floor(a / L.w), group: 2, open: false, charge: 0, need: 2 });
+  L.grid[b] = T.PLATE;
+  L.plates.push({ x: b % L.w, y: Math.floor(b / L.w), group: 2 });
+  cg.dirtyCells.add(a); cg.dirtyCells.add(b);
+  R.render(registry['game'].getContext('2d'), cg, registry['game'], 0);
+  ok(true, 'GATE/PLATE 组号绘制分支无异常');
+}
+
+/* 调试模式回归：flag 关闭 → 零副作用；开启 → 跳层 / 无敌 / 叠层可用 */
+if (STUB_DEBUG) {
+  const DBG = window.__echoDebug;
+  ok(!!(DBG && DBG.enabled === true), `调试 flag 生效并挂载 __echoDebug（${URL_DEBUG ? 'URL' : 'localStorage'} 通路）`);
+  const f0 = DBG.state.floor;
+  ok(f0 >= 1, `调试 API 读到当前楼层 F${f0}`);
+  ok(DBG.jump(1) === true && DBG.state.floor === f0 + 1, `跳层 +1 → F${DBG.state.floor}`);
+  ok(DBG.jump(-1) === true && DBG.state.floor === f0, `跳层 -1 回到 F${DBG.state.floor}`);
+  ok(DBG.toggleInvuln() === true && DBG.state.invuln === true, '开启无敌');
+  ok(DBG.toggleInvuln() === false && DBG.state.invuln === false, '关闭无敌');
+  /* 键盘通路：真正派发 keydown，验证 main.js 的监听确实注册 */
+  const fireDebug = (code) => {
+    const ev = { code, repeat: false, preventDefault() {} };
+    (winListeners['keydown'] || []).forEach((f) => f(ev));
+  };
+  fireDebug('BracketRight');
+  ok(DBG.state.floor === f0 + 1, `键盘 ] 跳层至 F${DBG.state.floor}`);
+  fireDebug('KeyI');
+  ok(DBG.state.invuln === true, '键盘 I 切换无敌');
+  fireDebug('BracketLeft');
+  ok(DBG.state.floor === f0, `键盘 [ 回到 F${DBG.state.floor}`);
+  /* 边界：F1 不可再往下跳 */
+  ok(DBG.jump(-100) === false && DBG.state.floor === 1, '跳层下限钳制在 F1');
+  ok(DBG.jump(100) === true && DBG.state.floor === 100, '跳层上限钳制在 F100');
+  /* 逻辑层：无敌时伤害被吞掉，关闭后正常扣血 */
+  const dg = window.EchoGame.create({ seed: 7, floor: 1, classId: 'knight' });
+  dg.debugInvuln = true;
+  const hp0 = dg.player.hp;
+  dg.damagePlayer(2, 'contact', null);
+  ok(dg.player.hp === hp0, `无敌时 HP 不变 (${dg.player.hp})`);
+  dg.debugInvuln = false;
+  dg.damagePlayer(1, 'water', null);
+  ok(dg.player.hp === hp0 - 1, `关闭无敌后正常扣血 (${dg.player.hp})`);
+  /* 渲染层：叠层函数可调用且不抛错 */
+  window.EchoRender.drawDebugOverlay(registry['game'].getContext('2d'), dg, registry['game']);
+  ok(true, '调试叠层绘制无异常');
+} else {
+  ok(typeof window.__echoDebug === 'undefined', '调试 flag 关闭时不挂载 __echoDebug');
+  ok(typeof window.EchoRender.drawDebugOverlay === 'function', '调试叠层已导出但主循环不会调用');
 }
 
 console.log('—'.repeat(40));
