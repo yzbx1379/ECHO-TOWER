@@ -63,6 +63,7 @@
 ## 🗂 工程结构
 
 ```
+LICENSE                 MIT 许可全文（唯一事实源；GitHub / 合规工具识别用）
 index.html              入口页面
 css/style.css           霓虹暗黑美术风格
 js/data.js              数据表（群系/敌人/BOSS/遗物/天赋/职业/护符）
@@ -86,7 +87,7 @@ test/gen.test.cjs       生成器自动化测试（5 种子 × 100 层）
 test/sim.test.cjs       端到端逻辑模拟（3 种子通关 F100 → F101）
 test/combat.test.cjs    真实 HP 战斗 / 死亡 / 复活回归（20 项，不用 9999 HP）
 test/dom-stub.cjs       DOM 桩冒烟（常规 / --debug / --url-debug 三种模式）
-test/static.test.cjs    index.html ↔ sw.js 缓存清单一致性（含 Worker 白名单）
+test/static.test.cjs    index.html ↔ sw.js 缓存清单双向比对（含 Worker 白名单、SW 版本化、许可一致性）
 test/smoke.cjs          Playwright 浏览器截图冒烟（需本机执行权限）
 test/fetch-browser.cjs  浏览器下载辅助脚本
 DESIGN.md               完整设计文档
@@ -106,14 +107,14 @@ node test/combat.test.cjs         # 20 项：真实 6~8 HP 的减伤/闪避/复�
 node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘制分支
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
-node test/static.test.cjs         # 76 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单与 SW 版本化）
+node test/static.test.cjs         # 87 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单、SW 版本化与许可一致性）
 node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三分辨率/触屏/小字号/SW 离线回落）
 npm run test:survival          # 观测工具（非门禁）：真实 HP 下机器人死亡楼层分布
 ```
 
-`npm test` 依次执行 `gen` → `sim` → `combat` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、导航请求 network-first。
+`npm test` 依次执行 `gen` → `sim` → `combat` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、导航请求 network-first，以及 LICENSE / package.json / lock root / README 四处许可声明一致。
 
-> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 48/60/60、static 76/76）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 48/60/60、static 87/87）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
 
 ## 🐞 调试模式
 
@@ -148,36 +149,9 @@ npm run test:survival          # 观测工具（非门禁）：真实 HP 下机�
 ## 📄 许可与来源
 
 - 运行时零第三方依赖；图形全部由 Canvas 程序化绘制、音效全部由 WebAudio 合成，未包含外部美术/音频素材。在线字体为可选加载，离线自动降级。
-- 本项目采用 **MIT License**。按仓库约定，许可全文与来源声明合并进本节，**不单独放 `LICENSE.md`**；`package.json` 的 `license` 字段同步为 `MIT`。
-- Copyright 年份取自本仓库最早提交（2026），持有人取自 Git 提交身份 `叶子不小 (yzbx1379)`；如需改用其它署名，直接修改下方许可文本与 `package.json` 即可。
-
-### MIT License
-
-```text
-MIT License
-
-Copyright (c) 2026 叶子不小 (yzbx1379)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-
-
+- 本项目采用 **MIT License**，许可全文见仓库根目录的 [`LICENSE`](LICENSE)；`package.json` 的 `license` 字段同步为 `MIT`。
+- 单独放 `LICENSE` 是为了让 GitHub Licensee、`license:mit` 检索与依赖合规扫描等工具能机器可读地识别许可——README 内的散文式声明不会被这些工具解析。来源与说明仍集中在本节，不散落为多份文档。
+- Copyright 年份取自本仓库最早提交（2026），持有人取自 Git 提交身份 `叶子不小 (yzbx1379)`；如需改用其它署名，同步修改 `LICENSE` 与 `package.json` 即可。
+- `LICENSE` 是许可文本的**唯一事实源**，README 不再重复全文；`test/static.test.cjs` 校验四处一致性，防止漂移。
 
 *—— 塔记住了你的每一步。*

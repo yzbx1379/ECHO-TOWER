@@ -15,7 +15,7 @@ npm test                          # 一键跑下面全部 Node 测试
 #  = node test/dom-stub.cjs             UI 冒烟 + 调试关闭 + 色盲组号分支
 #  = node test/dom-stub.cjs --debug      调试模式(localStorage 通路)
 #  = node test/dom-stub.cjs --url-debug  调试模式(URL ?debug=1 通路)
-#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(73 项，含 Worker 白名单)
+#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(87 项，含 Worker 白名单与许可一致性)
 npm run lint                      # ESLint(0 error 门槛，已纳入 CI)
 npm run format:check              # Prettier 全量格式门禁(已纳入 CI)
 node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本机执行权限)
@@ -248,7 +248,7 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | ✅ 任务13:heldKarp 改 Float64Array,8000 组随机矩阵与旧 Map 版逐例等价 |
 | 2026-11-06 | ✅ 任务14:systems.js 1326 行拆 5 个 mixin,方法数 80→80,sim 回合数不变 |
 | 2026-11-06 | ✅ 任务8:首层 Web Worker + 换层预取;`file://` 同步兜底实测通过,smoke 扩至 14/14 |
-| 2026-11-06 | 📄 MIT 许可并入 README 独立章节(不建 LICENSE.md),package.json/lock 同步 |
+| 2026-11-06 | 📄 MIT 许可并入 README 独立章节(当时未建 LICENSE.md,口径于 2026-11-06 修订),package.json/lock 同步 |
 | 2026-11-06 | 🎨 Prettier 全量重排 23 文件(+6491/−4016,单独提交),format:check 升级为 CI 门禁 |
 | 2026-11-06 | 🧹 清理 27 条存量 ESLint warning(未用变量 / close 前置引用 / 桩声明提前 / 补 lastErr 诊断),lint 0 error 0 warning |
 | 2026-11-06 | 🧪 smoke 扩至 24/24:灰度滤镜 + 组号徽记专项探针 + 三分辨率 + 触屏链路实测,目视截图复检通过 |
@@ -267,3 +267,5 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | 🐛 修 prefetch 超时状态不一致:抽 disableWorker 统一收口,dom-stub 假 Worker 5 条断言 |
 | 2026-11-06 | 🛡 mixin 合并加同名方法冲突快速失败;调试叠层明示 rng 跳层差异(推翻上一轮「bug」判断) |
 | 2026-11-06 | 📊 项数:dom-stub 39/51/51→48/60/60;全套回归与 lint 0-0 全绿 |
+| 2026-11-06 | 📄 **许可落点口径修订**(用户拍板方案 A):新增根目录 `LICENSE`(无扩展名、MIT 全文、唯一事实源),README 删重复全文改为指向;依据:GitHub 页面实测 `blob/main/LICENSE` / `licenseInfo` / `octicon-law` 均为 0,官方文档明确 Licensee 只比对 LICENSE* 文件 |
+| 2026-11-06 | 🛡 `test/static.test.cjs` 加 11 条许可一致性断言(76→87),顺带修 package.json UTF-8 BOM 导致 JSON.parse 崩溃的健壮性问题 |

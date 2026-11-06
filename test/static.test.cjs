@@ -18,6 +18,8 @@ function ok(cond, msg) {
   } else fails.push(msg)
 }
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8')
+/* package.json 带 UTF-8 BOM，直接 JSON.parse 会抛 SyntaxError */
+const readJson = (rel) => JSON.parse(read(rel).replace(/^\uFEFF/, ''))
 const exists = (rel) => fs.existsSync(path.join(ROOT, rel))
 /* 路径归一：去掉 ./ 前缀与 query/hash，统一分隔符 */
 function norm(p) {
@@ -76,6 +78,25 @@ for (const ic of manifest.icons || []) {
 /* ---- 5. 关键交付文件齐全 ---- */
 for (const f of ['index.html', 'css/style.css', 'sw.js', 'manifest.webmanifest', 'favicon.svg', 'og.svg']) {
   ok(exists(f), `交付文件缺失：${f}`)
+}
+
+/* ---- 6. 许可声明一致性（唯一事实源：根目录 LICENSE） ----
+ * GitHub Licensee 只比对 LICENSE* 文件；README 里的散文式声明不被识别。
+ * 这里锁定「LICENSE 全文 / package.json / lock root / README 指向」四处不漂移。 */
+ok(exists('LICENSE'), '根目录缺少 LICENSE（GitHub 与合规工具无法识别许可）')
+if (exists('LICENSE')) {
+  const lic = read('LICENSE')
+  ok(/^MIT License/m.test(lic), 'LICENSE 未使用标准 MIT 标题')
+  ok(/Copyright \(c\) \d{4} \S/.test(lic), 'LICENSE 缺少 Copyright 行')
+  ok(lic.includes('Permission is hereby granted, free of charge'), 'LICENSE 缺少 MIT 授权条款')
+  ok(lic.includes('THE SOFTWARE IS PROVIDED "AS IS"'), 'LICENSE 缺少免责声明')
+  ok(readJson('package.json').license === 'MIT', 'package.json 的 license 不是 MIT')
+  ok(readJson('package-lock.json').packages[''].license === 'MIT', 'lock root 的 license 不是 MIT')
+  const readme = read('README.md')
+  ok(/## .*许可与来源/.test(readme), 'README 缺少「许可与来源」章节')
+  ok(/\]\(LICENSE\)/.test(readme), 'README 未链接到 LICENSE')
+  ok(!/```text\s*\nMIT License/.test(readme), 'README 仍内嵌 MIT 全文（会与 LICENSE 漂移）')
+  ok(!cacheSet.has('LICENSE'), 'LICENSE 不是运行时资源，不应进 SW 预缓存')
 }
 
 /* ---- 结果 ---- */
