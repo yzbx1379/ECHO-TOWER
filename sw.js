@@ -1,6 +1,6 @@
 /* =========================================================================
  * 《回声之塔 ECHO TOWER》 — service worker
- * 离线缓存核心资源（stale-while-revalidate）。
+ * 离线缓存核心资源：在线 network-first，离线回落缓存。
  * 仅在 https / localhost 下生效；file:// 双击游玩时不注册（main.js 静默失败）。
  * ========================================================================= */
 const ASSETS = [
@@ -25,14 +25,22 @@ const ASSETS = [
   './js/gen.worker.js',
   './js/main.js',
   './favicon.svg',
+  './icon-192.png',
+  './icon-512.png',
   './manifest.webmanifest',
 ]
 
+/* 仅离线缓存、不被 index.html 以同源相对路径引用的资源。
+ * static.test.cjs 从这里读取白名单，避免测试里再硬编码一份。
+ * （og.png 是社交预览图，只需公开 URL，不进离线缓存。） */
+const CACHE_ONLY = ['./js/gen.worker.js']
+
 /* 版本化缓存：缓存名由 ASSETS 清单内容派生（FNV-1a 32 位）。
- * 清单一变（新增/删除脚本）缓存名就变，activate 会清掉所有旧名缓存，
- * 不再需要人工 bump 版本号——本轮一次新增 7 个 js 却忘了改 v1，正是这个疏漏。
- * JS 文件没有内容哈希文件名，因此还要配合下面 navigation 的 network-first，
- * 避免 stale-while-revalidate 把新旧 index.html / js 混成同一个版本。 */
+ * 清单一变（新增/删除脚本）缓存名就变，activate 会清掉所有旧名缓存。
+ * ⚠ 缓存名只反映「清单」，不反映「文件内容」：只改 js/css 内容时 sw.js 字节不变，
+ * 浏览器不会触发 SW update，install 不重跑。因此所有同源请求一律 network-first
+ * （在线拿最新、顺带刷新缓存），离线才回落缓存。实测：改 core.js 内容后，
+ * 旧的 stale-while-revalidate 会让第一次 reload 仍执行旧脚本、第二次才更新。 */
 function cacheKey(list) {
   let h = 2166136261
   const s = list.join('|')
@@ -84,19 +92,17 @@ self.addEventListener('fetch', (e) => {
     )
     return
   }
-  // 其余同源资源：stale-while-revalidate
+  // 其余同源资源：network-first + 离线回落（理由见文件头注释）。
+  // 在线拿最新内容并刷新缓存；离线或网络失败时用缓存兜底，PWA 仍可玩。
   e.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const clone = res.clone()
-            caches.open(CACHE).then((c) => c.put(req, clone))
-          }
-          return res
-        })
-        .catch(() => cached)
-      return cached || network
-    }),
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          const clone = res.clone()
+          caches.open(CACHE).then((c) => c.put(req, clone))
+        }
+        return res
+      })
+      .catch(async () => (await caches.match(req)) || Response.error()),
   )
 })

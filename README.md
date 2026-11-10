@@ -81,14 +81,20 @@ js/audio.js             WebAudio 合成音效与环境音乐
 js/prefetch.js          楼层预生成调度（Worker 缓存 + 同步 fallback）
 js/gen.worker.js        地牢生成 Worker（由 new Worker 加载，非 <script>）
 js/main.js              标题流程/输入泵/主循环/存档/调试开关
-sw.js                   Service Worker（ASSETS 清单派生版本化缓存 + navigation network-first）
+sw.js                   Service Worker（清单派生缓存 + 同源 network-first + 离线回落）
 manifest.webmanifest    PWA 安装清单
+icon-192.png / icon-512.png  PWA PNG 图标
+og.png                  1200×630 社交预览图（不进离线缓存）
 test/gen.test.cjs       生成器自动化测试（5 种子 × 100 层）
 test/sim.test.cjs       端到端逻辑模拟（3 种子通关 F100 → F101）
 test/combat.test.cjs    真实 HP 战斗 / 死亡 / 复活回归（20 项，不用 9999 HP）
+test/echo.test.cjs      回声重演核心机制回归（36 项：录像/重演/消散/回尘/BOSS 回声/回溯）
 test/dom-stub.cjs       DOM 桩冒烟（常规 / --debug / --url-debug 三种模式）
-test/static.test.cjs    index.html ↔ sw.js 缓存清单双向比对（含 Worker 白名单、SW 版本化、许可一致性）
+test/static.test.cjs    index.html ↔ sw.js 清单双向比对（101 项：白名单、SW 版本化、许可与存储收敛）
 test/smoke.cjs          Playwright 浏览器截图冒烟（需本机执行权限）
+test/docs.test.cjs      文档口径护栏（项数 / 过时口径 / 源码断言数）
+test/sw-stale.cjs       SW 发布陈旧真浏览器回归 + 离线回落
+test/perf.cjs           渲染性能护栏（drawMinimap 耗时上限）
 test/fetch-browser.cjs  浏览器下载辅助脚本
 DESIGN.md               完整设计文档
 plan.md                 优化执行计划与变更记录
@@ -100,21 +106,40 @@ plan.md                 优化执行计划与变更记录
 npm test                 # 一键跑完全部 Node 测试（见下）
 npm run lint             # ESLint，0 error / 0 warning 门槛，已纳入 CI
 npm run format:check     # Prettier 全量格式门禁，已纳入 CI
+npm run test:sw          # SW 发布陈旧真浏览器回归（4 项）
+npm run test:perf        # 渲染性能护栏（3 项）
 
 node test/gen.test.cjs            # 12,950 项断言：可解性 + 每层≥50步（约 2.8ms/层）
 node test/sim.test.cjs            # 端到端：3 种子真实爬塔通关 F100 → F101
 node test/combat.test.cjs         # 20 项：真实 6~8 HP 的减伤/闪避/复活/失败结算
+node test/echo.test.cjs           # 36 项：回声重演核心机制（此前零直接断言）
 node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘制分支
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
-node test/static.test.cjs         # 87 项：index.html 引用 ↔ sw.js 预缓存清单双向比对（含 Worker 白名单、SW 版本化与许可一致性）
+node test/static.test.cjs         # 101 项：清单双向比对 + SW 版本化 + 许可/存储收敛 + PNG 图标
 node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三分辨率/触屏/小字号/SW 离线回落）
 npm run test:survival          # 观测工具（非门禁）：真实 HP 下机器人死亡楼层分布
 ```
 
-`npm test` 依次执行 `gen` → `sim` → `combat` → `dom-stub` ×3 模式 → `static`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、导航请求 network-first，以及 LICENSE / package.json / lock root / README 四处许可声明一致。
+`npm test` 依次执行 `gen` → `sim` → `combat` → `echo` → `dom-stub` ×3 模式 → `static` → `docs`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、同源请求 network-first、`CACHE_ONLY` 白名单单一事实源，
+以及 LICENSE / package.json / lock root / README 四处许可声明一致。浏览器侧新增探针一律独立文件
+（`test:sw` / `test:perf`），不再往 `smoke.cjs` 里堆。
 
-> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、dom-stub 48/60/60、static 87/87）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、echo 36 项回声重演、dom-stub 56/68/68、static 101/101）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+
+**第七轮（2026-11-10）**：修复三类确证缺陷——① `sw.js` 同源资源全面改 network-first + 离线回落，
+消除「改 JS 内容但 `ASSETS` 清单不变」时首帧执行旧脚本的混版本窗口（真浏览器探针 `npm run test:sw`
+断言第 1 次 reload 即拿到新脚本、断网仍回落缓存）；② `render.js` 静态层缓存 key 加入 seed 并校验
+level 对象身份，防止同一页面换一局显示上一局地图（碰撞却用新 grid）；③ `main.js` 统一 `EchoStore`
+封装，隐私模式 / 配额满时开局不再中断。新增 `test/echo.test.cjs` **echo 36 项**覆盖回声重演核心机制
+（此前零直接断言）。小地图性能实测 F100 仅 ~0.09ms/次（约 0.5% 帧预算），**推翻上轮「中优先级
+优化」判断**，只做零风险常量提权 + `npm run test:perf` 护栏，不上离屏缓存与脏标记。补 192 与 512 像素 PNG
+图标与 `og.png` 社交预览图；CI 改 `npm ci` + Node 22 + concurrency + `npm audit`，`CACHE_ONLY`
+白名单改为 `sw.js` 单一事实源，新增 `test/docs.test.cjs` 锁定文档数字与源码断言数。
+
+**已知边界**：`smoke.cjs` 是单浏览器会话的线性流程（483 行），本轮**不做纯为减行数的拆分**
+（跨文件传 page/context 反而增加耦合），改为约定「新增浏览器探针一律独立文件」并加行数护栏；
+本机 npm registry 为 npmmirror，`npm audit` 端点未实现（换官方源实测 0 漏洞 / 103 依赖），CI 已显式指定官方源。
 
 ## 🐞 调试模式
 

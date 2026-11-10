@@ -15,13 +15,17 @@ npm test                          # 一键跑下面全部 Node 测试
 #  = node test/dom-stub.cjs             UI 冒烟 + 调试关闭 + 色盲组号分支
 #  = node test/dom-stub.cjs --debug      调试模式(localStorage 通路)
 #  = node test/dom-stub.cjs --url-debug  调试模式(URL ?debug=1 通路)
-#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(87 项，含 Worker 白名单与许可一致性)
+#  = node test/echo.test.cjs           回声重演核心机制(36 项)
+#  = node test/static.test.cjs          index.html ↔ sw.js 缓存清单一致性(101 项，含白名单/许可/存储)
+#  = node test/docs.test.cjs            文档口径护栏
 npm run lint                      # ESLint(0 error 门槛，已纳入 CI)
 npm run format:check              # Prettier 全量格式门禁(已纳入 CI)
-node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本机执行权限)
+node test/smoke.cjs               # Playwright 真浏览器冒烟 28 项(需本机执行权限)
+npm run test:sw                   # SW 发布陈旧回归 4 项
+npm run test:perf                 # 渲染性能护栏 3 项
 ```
 
-回归标准:`gen.test.cjs` / `sim.test.cjs` / `combat.test.cjs` / `static.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` **0 error / 0 warning**;`npm run format:check` 通过;`smoke.cjs` 28 项全过且零控制台错误。
+回归标准:`gen.test.cjs` / `sim.test.cjs` / `combat.test.cjs` / `echo.test.cjs` / `static.test.cjs` / `docs.test.cjs` 全绿;`dom-stub.cjs` 三种模式均不得新增失败输出;`npm run lint` **0 error / 0 warning**;`npm run format:check` 通过;`smoke.cjs` 28 项全过且零控制台错误。
 > `format:check` **已是 CI 门禁**(2026-11-06 全量重排后):23 个文件已用 `prettier --write` 统一风格,与 `npm run lint` 同在 CI 的 lint job;降级为可选工具是 2026-10-24 的中间结论,已被推翻(详见任务 9 的状态再更正)。
 
 ---
@@ -269,3 +273,13 @@ node test/smoke.cjs               # Playwright 真浏览器冒烟 14 项(需本�
 | 2026-11-06 | 📊 项数:dom-stub 39/51/51→48/60/60;全套回归与 lint 0-0 全绿 |
 | 2026-11-06 | 📄 **许可落点口径修订**(用户拍板方案 A):新增根目录 `LICENSE`(无扩展名、MIT 全文、唯一事实源),README 删重复全文改为指向;依据:GitHub 页面实测 `blob/main/LICENSE` / `licenseInfo` / `octicon-law` 均为 0,官方文档明确 Licensee 只比对 LICENSE* 文件 |
 | 2026-11-06 | 🛡 `test/static.test.cjs` 加 11 条许可一致性断言(76→87),顺带修 package.json UTF-8 BOM 导致 JSON.parse 崩溃的健壮性问题 |
+| 2026-11-10 | 🔍 第二轮全项目复查(只读):SW 内容陈旧、静态层跨局复用、saveMeta 裸调用等 8 类新发现 |
+| 2026-11-10 | 🔧 SW 同源资源全面 network-first + 离线回落;实测旧策略第 1 次 reload 仍执行旧脚本,新策略首次即新脚本 |
+| 2026-11-10 | 🖼 静态层 key 加 seed + level 身份校验,防同页换局显示上一局地图;dom-stub 加 6 条防回归断言 |
+| 2026-11-10 | 🛡 main.js 统一 EchoStore 封装(9 处裸调用收敛),存储全抛错时开局不中断;static.test 静态锁定 3 处原生调用 |
+| 2026-11-10 | 🧪 新增 test/echo.test.cjs 36 项:录像/重演坐标/消散/撞玩家/回尘翻倍/BOSS 回声/回溯/存档录像 |
+| 2026-11-10 | 📉 小地图实测 F100 仅 0.0893→0.0852 ms/次,推翻「中优先级优化」判断,只做零风险常量提权 + perf 护栏 |
+| 2026-11-10 | 🖼 生成 icon-192/512.png 与 og.png(社交平台不识别 SVG);index/manifest/ASSETS 同步 |
+| 2026-11-10 | ⚙️ CI: npm ci / Node 22 / concurrency / npm audit;engines >=20;CACHE_ONLY 改 sw.js 单一事实源 |
+| 2026-11-10 | 📐 新增 test/docs.test.cjs 文档口径护栏 + test/sw-stale.cjs 4 项 + test/perf.cjs 3 项;smoke.cjs 约定新增探针独立文件 |
+| 2026-11-10 | 📊 项数:static 87→101、dom-stub 48/60/60→56/68/68、新增 echo 36 / sw-stale 4 / perf 3 |

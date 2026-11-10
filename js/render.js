@@ -194,11 +194,20 @@
     return STATIC_TILES.has(t)
   }
   let _staticCanvas = null,
-    _staticKey = null
+    _staticKey = null,
+    _staticLevel = null
+  // key 必须能区分「同一页面换一局」：biome 与 w/h 只由 floor 决定，
+  // 不同 seed 的 F1 会算出完全相同的 floor:biome:w×h，但 grid 不同。
+  // 导出供测试断言，防止再退化为只看 floor/biome/尺寸。
+  function staticLayerKey(game) {
+    const L = game.level
+    return game.seed + ':' + L.floor + ':' + L.biomeId + ':' + L.w + 'x' + L.h
+  }
   function ensureStaticLayer(game) {
     const L = game.level
-    const key = L.floor + ':' + L.biomeId + ':' + L.w + 'x' + L.h
-    if (_staticCanvas && _staticKey === key) {
+    const key = staticLayerKey(game)
+    // 再加 level 对象身份，覆盖 debug 跳层 / 存档恢复等同 key 换 level 的场景。
+    if (_staticCanvas && _staticKey === key && _staticLevel === L) {
       // 运行中 grid 被改写（炸弹炸墙/薄冰变水/地砖变箭头）时，
       // 局部重绘脏格到离屏缓存，否则缓存保留旧值导致视觉错乱。
       if (game.dirtyCells && game.dirtyCells.size) {
@@ -229,6 +238,7 @@
     }
     _staticCanvas = off
     _staticKey = key
+    _staticLevel = L
     return off
   }
   function drawStaticTile(ctx, game, x, y, pal) {
@@ -925,11 +935,13 @@
     mctx.clearRect(0, 0, canvas.width, canvas.height)
     mctx.fillStyle = 'rgba(8,10,16,.85)'
     mctx.fillRect(0, 0, canvas.width, canvas.height)
+    // 地形色是常量，提到循环外一次赋值即可；实测 F100 全量重绘仅 ~0.09ms/次
+    // （约 0.5% 帧预算），不值得为此引入离屏缓存 + 脏标记的失效状态。
+    mctx.fillStyle = 'rgba(140,160,150,.4)'
     for (let y = 0; y < L.h; y++) {
       for (let x = 0; x < L.w; x++) {
         const t = L.grid[y * L.w + x]
         if (t === T.WALL) continue
-        mctx.fillStyle = 'rgba(140,160,150,.4)'
         mctx.fillRect(x * scale, y * scale, scale, scale)
       }
     }
@@ -1011,5 +1023,5 @@
     ctx.restore()
   }
 
-  window.EchoRender = { render, drawMinimap, drawDebugOverlay, groupMark, SMALL_FONT_PX, TS }
+  window.EchoRender = { render, drawMinimap, drawDebugOverlay, groupMark, staticLayerKey, SMALL_FONT_PX, TS }
 })()

@@ -640,6 +640,68 @@ if (STUB_DEBUG) {
   ok(g.rng.getState() !== (g.seed ^ (6 * 2654435761)) >>> 0, '从调试层继续爬仍走连续流')
 }
 
+/* 存储不可用（隐私模式 / 配额满）时的降级行为 */
+{
+  const saved = global.localStorage
+  global.localStorage = {
+    getItem() {
+      throw new Error('blocked')
+    },
+    setItem() {
+      throw new Error('blocked')
+    },
+    removeItem() {
+      throw new Error('blocked')
+    },
+  }
+  let threw = false
+  try {
+    window.EchoStore.set('probe', '1')
+    window.EchoStore.remove('probe')
+    ok(window.EchoStore.get('probe') === null, '存储全抛错时读取降级为 null')
+  } catch (e) {
+    threw = true
+  }
+  ok(!threw, '存储全抛错时 EchoStore 的 get/set/remove 均不抛异常')
+  global.localStorage = saved
+}
+
+/* 静态层缓存防回归：同一页面换一局不得复用上一局地图。
+ * 实测前置：biome / w/h 只由 floor 决定，不同 seed 的 F1 key 曾完全相同但 grid 不同。 */
+{
+  const RR = window.EchoRender
+  const keyFn = RR.staticLayerKey
+  const g1 = window.EchoGame.create({ seed: 111, floor: 1, classId: 'knight' })
+  const g2 = window.EchoGame.create({ seed: 999, floor: 1, classId: 'knight' })
+  const g3 = window.EchoGame.create({ seed: 111, floor: 1, classId: 'knight' })
+  ok(typeof keyFn === 'function', 'staticLayerKey 已导出')
+  ok(keyFn(g1) !== keyFn(g2), '不同 seed 的 F1 静态层 key 不同（含 seed）')
+  ok(keyFn(g1) === keyFn(g3), '同 seed 同层 key 相同')
+  ok(JSON.stringify(g1.level.grid) !== JSON.stringify(g2.level.grid), '前置：不同 seed 的 F1 地图确实不同')
+
+  // render.js 里只有 ensureStaticLayer 会 createElement('canvas')，计数即重建次数
+  const origCreate = documentStub.createElement
+  let made = 0
+  documentStub.createElement = (tag) => {
+    if (tag === 'canvas') made++
+    return origCreate(tag)
+  }
+  try {
+    const cv = registry['game']
+    const ctx = cv.getContext('2d')
+    RR.render(ctx, g1, cv, 0)
+    const n1 = made
+    RR.render(ctx, g2, cv, 0) // 换 seed
+    const n2 = made
+    RR.render(ctx, g3, cv, 0) // 同 seed 但 level 对象不同
+    const n3 = made
+    ok(n2 > n1, '换 seed 渲染时静态层被重建（不再显示上一局地图）')
+    ok(n3 > n2, '同 seed 换实例时按 level 身份重建')
+  } finally {
+    documentStub.createElement = origCreate
+  }
+}
+
 console.log('—'.repeat(40))
 if (fail) {
   console.error(`✗ ${fail} 项失败`)

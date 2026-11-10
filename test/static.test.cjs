@@ -56,7 +56,12 @@ ok(!/const CACHE = ['"]echo-tower-v\d/.test(sw), 'SW 不再硬编码缓存版本
 ok(/req\.mode === 'navigate'/.test(sw), 'SW 导航请求走 network-first（防混合版本）')
 /* Worker 脚本由 new Worker() 加载，不在 index.html 的 src/href 里，
  * 但离线时必须进缓存。这类资源只校验「存在 + 已缓存」，不要求被 index.html 引用。 */
-const CACHE_ONLY = new Set(['js/gen.worker.js'])
+/* 白名单单一事实源在 sw.js，测试里不再硬编码一份 */
+const coBlock = sw.match(/const\s+CACHE_ONLY\s*=\s*\[([\s\S]*?)\]/)
+ok(!!coBlock, 'sw.js 中未找到 CACHE_ONLY 白名单')
+const CACHE_ONLY = new Set(coBlock ? [...coBlock[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => norm(x[1])) : [])
+ok(CACHE_ONLY.size > 0, 'CACHE_ONLY 白名单非空')
+for (const f of CACHE_ONLY) ok(!refs.has(f), `CACHE_ONLY 项 ${f} 已被 index.html 引用，白名单可移除`)
 for (const r of refs) {
   ok(cacheSet.has(r), `index.html 引用了 ${r}，但 sw.js ASSETS 未缓存 → 离线会缺文件`)
 }
@@ -79,6 +84,12 @@ for (const ic of manifest.icons || []) {
 for (const f of ['index.html', 'css/style.css', 'sw.js', 'manifest.webmanifest', 'favicon.svg', 'og.svg']) {
   ok(exists(f), `交付文件缺失：${f}`)
 }
+
+/* ---- 5.5 存储访问收敛：main.js 只有 EchoStore 封装内部能碰原生 localStorage ----
+ * 隐私模式 / 配额满时 localStorage 会抛错，任何一处裸调用都会中断开局。 */
+const mainSrc = read('js/main.js')
+const nakedStorage = [...mainSrc.matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(/g)]
+ok(nakedStorage.length === 3, `main.js 只允许 EchoStore 内部 3 处原生调用（实际 ${nakedStorage.length}）`)
 
 /* ---- 6. 许可声明一致性（唯一事实源：根目录 LICENSE） ----
  * GitHub Licensee 只比对 LICENSE* 文件；README 里的散文式声明不被识别。

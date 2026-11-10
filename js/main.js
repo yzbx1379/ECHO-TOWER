@@ -16,11 +16,38 @@
   let state = 'title'
   const META_KEY = 'echoTower.meta'
 
+  /* 统一存储封装：隐私模式 / 配额满 / file:// 下 localStorage 访问会抛错。
+   * 任何一处裸调用中断都会让「点开始」直接失效，故全部读写走这里；
+   * 导出为 EchoStore 供测试在「存储全抛错」环境下断言降级行为。 */
+  const store = (window.EchoStore = {
+    get(k) {
+      try {
+        return localStorage.getItem(k)
+      } catch (e) {
+        return null
+      }
+    },
+    set(k, v) {
+      try {
+        localStorage.setItem(k, v)
+      } catch (e) {
+        /* 静默降级：本次元进度不持久化，本局仍可玩 */
+      }
+    },
+    remove(k) {
+      try {
+        localStorage.removeItem(k)
+      } catch (e) {
+        /* ignore */
+      }
+    },
+  })
+
   /* ---------------- 元进度 ---------------- */
   function loadMeta() {
     let parsed
     try {
-      parsed = JSON.parse(localStorage.getItem(META_KEY)) || {}
+      parsed = JSON.parse(store.get(META_KEY)) || {}
     } catch (e) {
       return defaultMeta()
     }
@@ -36,7 +63,7 @@
     return { v: 1, best: 0, dust: 0, runs: 0, wins: 0, charmsOwned: [], endlessUnlocked: false, muted: false }
   }
   function saveMeta(m) {
-    localStorage.setItem(META_KEY, JSON.stringify(m))
+    store.set(META_KEY, JSON.stringify(m))
   }
   let meta = loadMeta()
 
@@ -50,7 +77,7 @@
     try {
       const q = (typeof window !== 'undefined' && window.location && window.location.search) || ''
       if (/[?&]debug=1(?:&|$)/.test(q)) return true
-      if (typeof localStorage !== 'undefined' && localStorage.getItem(DEBUG_KEY) === '1') return true
+      if (typeof localStorage !== 'undefined' && store.get(DEBUG_KEY) === '1') return true
     } catch (e) {
       /* 受限环境一律按关闭处理 */
     }
@@ -154,7 +181,7 @@
       }
       btns.appendChild(b)
     }
-    const hasRun = !!localStorage.getItem('echoTower.run')
+    const hasRun = !!store.get('echoTower.run')
     if (hasRun) mk(en ? '▶ Continue Climb' : '▶ 继续攀爬', continueRun, 'primary')
     mk(hasRun ? (en ? 'New Run' : '新的一局') : en ? '▶ Start Climbing' : '▶ 开始攀登', () => classSelect(), 'primary')
     mk(en ? '◈ Monuments (Dust Charms)' : '◈ 塔碑（回尘护符）', charmScreen)
@@ -195,7 +222,7 @@
     const m = loadMeta()
     let run = null
     try {
-      run = JSON.parse(localStorage.getItem('echoTower.run'))
+      run = JSON.parse(store.get('echoTower.run'))
     } catch (e) {
       run = null
     }
@@ -212,7 +239,7 @@
         saveMeta(meta)
       }
       if (payload.run && typeof payload.run === 'object') {
-        localStorage.setItem('echoTower.run', JSON.stringify(payload.run))
+        store.set('echoTower.run', JSON.stringify(payload.run))
       }
       UI.toast(en ? '✓ Save restored' : '✓ 存档已恢复')
       return true
@@ -326,7 +353,7 @@
   }
 
   function startRun(classId) {
-    localStorage.removeItem('echoTower.run')
+    store.remove('echoTower.run')
     meta.runs++
     saveMeta(meta)
     const seed = (Math.random() * 1e9) | 0
@@ -349,7 +376,7 @@
   }
   function continueRun() {
     try {
-      const s = JSON.parse(localStorage.getItem('echoTower.run'))
+      const s = JSON.parse(store.get('echoTower.run'))
       game = window.EchoGame.create({
         seed: s.seed,
         floor: s.floor,
@@ -389,7 +416,7 @@
     meta.dust += sum.dust
     if (sum.floor > meta.best) meta.best = sum.floor
     saveMeta(meta)
-    localStorage.removeItem('echoTower.run')
+    store.remove('echoTower.run')
     setTimeout(() => UI.gameOver(sum, meta, () => classSelect(), titleScreen), 700)
   }
   function winRun(sum) {
@@ -428,7 +455,7 @@
         saveMeta(meta)
       },
       quit: () => {
-        localStorage.removeItem('echoTower.run')
+        store.remove('echoTower.run')
         finishRun(Object.assign(game.runSummary(), { dust: 0 }))
       },
     })
