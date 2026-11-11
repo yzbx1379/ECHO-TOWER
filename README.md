@@ -125,7 +125,11 @@ npm run test:survival          # 观测工具（非门禁）：真实 HP 下机�
 以及 LICENSE / package.json / lock root / README 四处许可声明一致。浏览器侧新增探针一律独立文件
 （`test:sw` / `test:perf`），不再往 `smoke.cjs` 里堆。
 
-> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、echo 36 项回声重演、dom-stub 56/68/68、static 101/101）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、echo 36 项回声重演、dom-stub 57/69/69、static 101/101）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+
+**第八轮（2026-11-11，CI 报错修复）**：CI 的「Node 测试」job 失败，原始日志定位到 `dom-stub.cjs:288` 找不到中文「开始攀登」按钮。根因是上一轮把 CI 的 Node 从 20 升到 22 后，Node 22 的全局 `navigator` 在 Linux runner 上是**只读属性**，`dom-stub` 的语言桩赋值被 `catch` 吞掉，`navigator.language='en-US'` 使 i18n 自动切英文；本机 Windows 的 Node 22 该属性可写且为 `zh-CN`，因此本地从未复现。修法：在桩里预置 `echoTower.lang='zh'`（i18n 优先读 localStorage，完全绕过宿主 navigator），并加一条断言锁定中文界面。已用「只读 navigator + en-US」场景**先复现、再验证**三种模式全绿。CI 的 Node.js 20 / ubuntu-latest 迁移提示属平台 notice，不是项目错误。
+
+同轮另修一个独立问题：在线字体的 woff2 请求在网络受限时会挂起，令 `page.goto({ waitUntil: 'load' })` 超时，实测拦截后 `load` 从 >12s 降到 **39ms**。新增 `test/browser-helpers.cjs` 在测试侧对外部字体返回空 CSS（不用 abort，避免产生 `net::ERR_FAILED` 被「控制台零错误」断言抓到），**不改生产页面**，三个浏览器测试不再依赖外网可达性。
 
 **第七轮（2026-11-10）**：修复三类确证缺陷——① `sw.js` 同源资源全面改 network-first + 离线回落，
 消除「改 JS 内容但 `ASSETS` 清单不变」时首帧执行旧脚本的混版本窗口（真浏览器探针 `npm run test:sw`

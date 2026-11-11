@@ -210,6 +210,11 @@ global.localStorage = {
   },
 }
 global.location = { search: URL_DEBUG ? '?debug=1' : '' }
+/* 固定中文界面：CI 的 Node 22 全局 navigator 是只读属性，上面的赋值桩不生效，
+ * 宿主 navigator.language 为 en-US 会让 i18n 自动切英文，导致下面按中文文案
+ * 查找「开始攀登」按钮失败（本机 zh-CN 不复现）。i18n 优先读 localStorage，
+ * 预置 lang 可彻底绕过宿主语言差异，保证测试在任意 Node / OS 上确定性一致。 */
+localStorage.setItem('echoTower.lang', 'zh')
 if (STUB_DEBUG && !URL_DEBUG) localStorage.setItem('echoTower.debug', '1')
 /* Base64 编解码：Node 16+ 已全局内置，老环境兜底 */
 global.btoa = global.btoa || ((s) => Buffer.from(s, 'binary').toString('base64'))
@@ -276,6 +281,7 @@ const ok = (c, m) => {
 }
 
 ok(global.window.EchoGame && typeof global.window.EchoGame.create === 'function', 'EchoGame 已挂载')
+ok(window.EchoLang.isEN() === false, 'DOM 桩固定中文界面（不受宿主 navigator.language 影响）')
 ok(registry['screen-root'] && !registry['screen-root'].classList.contains('hidden'), '标题界面已显示')
 
 /* 标题按钮存在性：title-btns 内应有 ≥4 个 .btn */

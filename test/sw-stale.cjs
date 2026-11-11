@@ -15,6 +15,7 @@ const os = require('os')
 const path = require('path')
 const http = require('http')
 const { chromium } = require('playwright')
+const { hardenBrowser } = require('./browser-helpers.cjs')
 
 const ROOT = path.join(__dirname, '..')
 const PORT = 8767
@@ -73,7 +74,7 @@ async function main() {
     })
     await new Promise((r) => server.listen(PORT, '127.0.0.1', r))
 
-    const browser = await chromium.launch({ headless: true })
+    const browser = hardenBrowser(await chromium.launch({ headless: true }))
     try {
       const ctx = await browser.newContext({ serviceWorkers: 'allow' })
       const page = await ctx.newPage()

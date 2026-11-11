@@ -283,3 +283,7 @@ npm run test:perf                 # 渲染性能护栏 3 项
 | 2026-11-10 | ⚙️ CI: npm ci / Node 22 / concurrency / npm audit;engines >=20;CACHE_ONLY 改 sw.js 单一事实源 |
 | 2026-11-10 | 📐 新增 test/docs.test.cjs 文档口径护栏 + test/sw-stale.cjs 4 项 + test/perf.cjs 3 项;smoke.cjs 约定新增探针独立文件 |
 | 2026-11-10 | 📊 项数:static 87→101、dom-stub 48/60/60→56/68/68、新增 echo 36 / sw-stale 4 / perf 3 |
+| 2026-11-11 | 🐛 修 CI「Node 测试」job 失败:原始日志定位 dom-stub.cjs:288 找不到中文开始按钮;根因是 Node 22 在 Linux runner 上全局 navigator 只读,i18n 按 en-US 切英文 |
+| 2026-11-11 | 🔒 dom-stub 预置 echoTower.lang=zh 固定语言 + 中文界面断言;用「只读 navigator + en-US」场景先复现再验证,不回退 CI 的 Node 22 |
+| 2026-11-11 | 📊 项数:dom-stub 56/68/68→57/69/69;CI 的 Node.js 20 deprecated / ubuntu-latest 迁移提示为平台 notice,非项目错误 |
+| 2026-11-11 | 🌐 修浏览器测试偶发超时:在线字体 woff2 挂起使 goto(load) 超时;新增 test/browser-helpers.cjs 返回空 CSS(非 abort,避免 ERR_FAILED),实测 load >12s→39ms |

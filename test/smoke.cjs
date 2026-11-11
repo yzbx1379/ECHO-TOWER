@@ -23,6 +23,7 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('playwright')
+const { hardenBrowser } = require('./browser-helpers.cjs')
 
 const ROOT = path.join(__dirname, '..')
 const PORT = 8765
@@ -75,7 +76,7 @@ const ok = (cond, msg) => {
   console.log('HTTP server → http://localhost:' + PORT + '/')
 
   const errors = []
-  const browser = await chromium.launch({ headless: true })
+  const browser = hardenBrowser(await chromium.launch({ headless: true }))
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text())
