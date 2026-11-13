@@ -287,3 +287,8 @@ npm run test:perf                 # 渲染性能护栏 3 项
 | 2026-11-11 | 🔒 dom-stub 预置 echoTower.lang=zh 固定语言 + 中文界面断言;用「只读 navigator + en-US」场景先复现再验证,不回退 CI 的 Node 22 |
 | 2026-11-11 | 📊 项数:dom-stub 56/68/68→57/69/69;CI 的 Node.js 20 deprecated / ubuntu-latest 迁移提示为平台 notice,非项目错误 |
 | 2026-11-11 | 🌐 修浏览器测试偶发超时:在线字体 woff2 挂起使 goto(load) 超时;新增 test/browser-helpers.cjs 返回空 CSS(非 abort,避免 ERR_FAILED),实测 load >12s→39ms |
+| 2026-11-13 | 🔍 第三轮全项目复查(只读):存档码零校验、DESIGN 数值漂移、英文模式残留中文、存档码体积 4 类新发现 |
+| 2026-11-13 | 🛡 存档码加字段白名单/范围校验/可选 sum(FNV-1a);v:1 不变、旧码无 sum 兼容;dom-stub 加 10 条断言 |
+| 2026-11-13 | 📐 DESIGN.md 相撞/击碎回尘数值与实现对齐(4~8、无金币);更正「floor>100 越界」误判(无尽模式合法) |
+| 2026-11-13 | 🌐 修 4 处英文模式中文残留 + 新增 test/i18n.test.cjs 护栏(65 处中文零未翻译,负例自检有效) |
+| 2026-11-13 | 📊 项数:dom-stub 57/69/69→68/80/80;存档码体积 1000步23.8KB / 8000步187.9KB 如实记录不压缩 |

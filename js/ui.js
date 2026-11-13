@@ -201,7 +201,7 @@
           if (onBuy(it)) {
             it.sold = true
             refresh()
-          } else window.EchoUI.toast('金币不足！')
+          } else window.EchoUI.toast(en ? 'Not enough gold!' : '金币不足！')
         }
         list.appendChild(btn)
       })

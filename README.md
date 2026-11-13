@@ -92,6 +92,7 @@ test/echo.test.cjs      回声重演核心机制回归（36 项：录像/重演/
 test/dom-stub.cjs       DOM 桩冒烟（常规 / --debug / --url-debug 三种模式）
 test/static.test.cjs    index.html ↔ sw.js 清单双向比对（101 项：白名单、SW 版本化、许可与存储收敛）
 test/smoke.cjs          Playwright 浏览器截图冒烟（需本机执行权限）
+test/i18n.test.cjs      UI 文案国际化护栏（跨行三元感知扫描）
 test/docs.test.cjs      文档口径护栏（项数 / 过时口径 / 源码断言数）
 test/sw-stale.cjs       SW 发布陈旧真浏览器回归 + 离线回落
 test/perf.cjs           渲染性能护栏（drawMinimap 耗时上限）
@@ -108,6 +109,7 @@ npm run lint             # ESLint，0 error / 0 warning 门槛，已纳入 CI
 npm run format:check     # Prettier 全量格式门禁，已纳入 CI
 npm run test:sw          # SW 发布陈旧真浏览器回归（4 项）
 npm run test:perf        # 渲染性能护栏（3 项）
+npm run test:i18n        # UI 文案国际化护栏
 
 node test/gen.test.cjs            # 12,950 项断言：可解性 + 每层≥50步（约 2.8ms/层）
 node test/sim.test.cjs            # 端到端：3 种子真实爬塔通关 F100 → F101
@@ -117,19 +119,35 @@ node test/dom-stub.cjs            # UI 冒烟 + 调试关闭 + 色盲组号绘�
 node test/dom-stub.cjs --debug      # 调试模式（localStorage 通路）
 node test/dom-stub.cjs --url-debug  # 调试模式（URL ?debug=1 通路）
 node test/static.test.cjs         # 101 项：清单双向比对 + SW 版本化 + 许可/存储收敛 + PNG 图标
+node test/i18n.test.cjs           # UI 文案国际化护栏：3 个 UI 文件 65 处中文字符串零未翻译
 node test/smoke.cjs               # 真浏览器 28 项（PWA/Worker/灰度/三分辨率/触屏/小字号/SW 离线回落）
 npm run test:survival          # 观测工具（非门禁）：真实 HP 下机器人死亡楼层分布
 ```
 
-`npm test` 依次执行 `gen` → `sim` → `combat` → `echo` → `dom-stub` ×3 模式 → `static` → `docs`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、同源请求 network-first、`CACHE_ONLY` 白名单单一事实源，
+`npm test` 依次执行 `gen` → `sim` → `combat` → `echo` → `dom-stub` ×3 模式 → `static` → `i18n` → `docs`。`static.test.cjs` 是 PWA 的防白屏守卫：新增资源若忘了写进 `sw.js` 的 `ASSETS`，或清单里留了已删除的文件，测试会直接失败；它同时断言 SW 缓存名由清单派生、同源请求 network-first、`CACHE_ONLY` 白名单单一事实源，
 以及 LICENSE / package.json / lock root / README 四处许可声明一致。浏览器侧新增探针一律独立文件
 （`test:sw` / `test:perf`），不再往 `smoke.cjs` 里堆。
 
-> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、echo 36 项回声重演、dom-stub 57/69/69、static 101/101）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
+> 质检口径：以上为**代码检测结果**（gen 12950/12950、combat 20 项真实 HP 回归、echo 36 项回声重演、dom-stub 68/80/80、static 101/101）；另在 Chromium headless 跑 `npm run smoke:browser`，**28/28 通过、控制台零错误**——含 Worker 生成层确定性、http 换层预取命中、`file://` 双击兜底、灰度滤镜、三档分辨率、触屏虚拟按键、390 宽小字号、SW 版本化缓存与离线 reload 九类实测；并留存 `?debug=1`、`grayscale(1)`、门/板徽记专项与小字号放大截图。灰度下组号徽记局部 `min=8 / max=245 / spread=237`，三分辨率横向溢出均为 0，小字号已统一 11px + 深色衬底。**第五轮修掉一个真 bug**：`damagePlayer` 扣血后 `recalcStats()` 把 HP 夹到至少 1，致死判定在其后，导致玩家永不死亡、复活与失败结算失效，现改用扣血后的 `lethal` 判定。**第六轮**：`npm run test:survival` 给出真实 HP 生存基线（3 种子死亡楼层 `[3, 2, 2]`、均值 2.3），但 **3/3 种子死亡前都超过 5000 回合**（内层 guard 上限 8000），属于机器人卡关后持续挨打，**不构成真人难度证据，因此不调整任何平衡数值**；真实平衡性仍需人工试玩。口径仍是「代码检测 + 真浏览器实测通过」，不写作「达标」。
 
 **第八轮（2026-11-11，CI 报错修复）**：CI 的「Node 测试」job 失败，原始日志定位到 `dom-stub.cjs:288` 找不到中文「开始攀登」按钮。根因是上一轮把 CI 的 Node 从 20 升到 22 后，Node 22 的全局 `navigator` 在 Linux runner 上是**只读属性**，`dom-stub` 的语言桩赋值被 `catch` 吞掉，`navigator.language='en-US'` 使 i18n 自动切英文；本机 Windows 的 Node 22 该属性可写且为 `zh-CN`，因此本地从未复现。修法：在桩里预置 `echoTower.lang='zh'`（i18n 优先读 localStorage，完全绕过宿主 navigator），并加一条断言锁定中文界面。已用「只读 navigator + en-US」场景**先复现、再验证**三种模式全绿。CI 的 Node.js 20 / ubuntu-latest 迁移提示属平台 notice，不是项目错误。
 
 同轮另修一个独立问题：在线字体的 woff2 请求在网络受限时会挂起，令 `page.goto({ waitUntil: 'load' })` 超时，实测拦截后 `load` 从 >12s 降到 **39ms**。新增 `test/browser-helpers.cjs` 在测试侧对外部字体返回空 CSS（不用 abort，避免产生 `net::ERR_FAILED` 被「控制台零错误」断言抓到），**不改生产页面**，三个浏览器测试不再依赖外网可达性。
+
+**第九轮（2026-11-13）**：按第三轮全项目复查结论做三件事。① 存档码从「只查 `v` 与 `typeof`」
+升级为**字段白名单 + 范围校验 + 可选 `sum` 校验和**（FNV-1a 32 位，防粘贴截断/位翻转）：
+实测空 `run`、缺必需字段、负 HP、荒谬楼层全部被拒；`v:1` 不变，旧码无 `sum` 时跳过校验和
+但同样走白名单，保持向后兼容。顺带**更正上一轮判断**：`floor > 100` 是无尽模式合法值
+（`endlessMul` 按 `f-100` 成长），不是越界，校验只挡荒谬值。② `DESIGN.md` 两处数值与实现
+对齐：相撞与击碎同走 `shatterEcho`，基础 4~8 回尘（主动猎手翻倍）、**无金币掉落**；
+BOSS 层表 F10…F100、回声透镜 6→12 步预览已核对一致。③ 修 4 处英文模式下仍弹中文的文案，
+新增 `test/i18n.test.cjs` 跨行三元感知护栏（3 个 UI 文件 65 处中文字符串零未翻译，
+负例注入自检确证能抓漏）。
+
+**本轮明确未做**：全量 i18n 三元重构（57 处，改动面大收益有限）、静态层离屏 canvas 优化
+（F100 约 6.64 MB RGBA，单引用由 GC 回收，未实测到压力）、存档码压缩（实测 1000 步录像
+23.8 KB / 8000 步 187.9 KB，如实记录但不擅自引入压缩依赖）。真实 HP 平衡性仍待人工试玩，
+本轮未调任何平衡数值。
 
 **第七轮（2026-11-10）**：修复三类确证缺陷——① `sw.js` 同源资源全面改 network-first + 离线回落，
 消除「改 JS 内容但 `ASSETS` 清单不变」时首帧执行旧脚本的混版本窗口（真浏览器探针 `npm run test:sw`

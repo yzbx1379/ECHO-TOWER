@@ -459,6 +459,47 @@ window.EchoLang.set('zh')
   // 篡改码被拒
   const bad = SIO.import('!!!这不是有效存档码!!!')
   ok(bad === false, '篡改码被拒')
+
+  /* 存档码入参校验 / 校验和 / 向后兼容（第四轮） */
+  const b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64')
+  const OLD = {
+    v: 1,
+    meta: { v: 1, best: 3, dust: 7, runs: 1, wins: 0, charmsOwned: [], endlessUnlocked: false, muted: false },
+    run: { v: 1, seed: 1, floor: 3, classId: 'knight', hp: 6 },
+  }
+  ok(SIO.import(b64({ ...OLD, run: {} })) === false, '空 run 被字段校验拒绝')
+  ok(SIO.import(b64({ ...OLD, run: { seed: 1 } })) === false, '缺必需字段被拒')
+  ok(SIO.import(b64({ ...OLD, run: { ...OLD.run, hp: -5 } })) === false, '负 HP 被拒')
+  ok(SIO.import(b64({ ...OLD, run: { ...OLD.run, floor: 999999 } })) === false, '荒谬楼层被拒')
+  ok(SIO.import(b64(OLD)) === true, '旧 v1 码（无 sum）向后兼容')
+  const newCode = SIO.export()
+  const decoded = JSON.parse(Buffer.from(newCode, 'base64').toString('utf8'))
+  ok(typeof decoded.sum === 'string' && decoded.sum.length > 0, '导出码带 sum 校验和')
+  const mid = Math.floor(newCode.length / 2)
+  const tampered = newCode.slice(0, mid) + (newCode[mid] === 'A' ? 'B' : 'A') + newCode.slice(mid + 1)
+  ok(SIO.import(tampered) === false, '带 sum 的码被篡改后拒绝')
+  ok(SIO.import(b64({ ...OLD, sum: 'wrong' })) === false, 'sum 不匹配被拒')
+  SIO.import(b64({ ...OLD, run: { ...OLD.run, evil: 'x' } }))
+  const stored = JSON.parse(localStorage.getItem('echoTower.run'))
+  ok(stored && stored.evil === undefined, '未知字段被白名单丢弃')
+  ok(stored && stored.floor === 3 && stored.classId === 'knight', '合法字段完整保留')
+  // 缺 meta 的存档码不应抹掉本机已有元进度
+  localStorage.setItem(
+    'echoTower.meta',
+    JSON.stringify({
+      v: 1,
+      best: 88,
+      dust: 123,
+      runs: 0,
+      wins: 0,
+      charmsOwned: [],
+      endlessUnlocked: false,
+      muted: false,
+    }),
+  )
+  SIO.import(b64({ v: 1, run: OLD.run }))
+  const keptMeta = JSON.parse(localStorage.getItem('echoTower.meta'))
+  ok(keptMeta && keptMeta.best === 88 && keptMeta.dust === 123, '缺 meta 的码不覆盖本机元进度')
 }
 
 /* 存档随机流复现：v1 新增可选 rng 字段，旧存档无该字段时保持原行为 */

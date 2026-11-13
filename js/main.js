@@ -95,7 +95,11 @@
   function toggleDebugInvuln() {
     if (!game) return false
     game.debugInvuln = !game.debugInvuln
-    UI.toast(`[DEBUG] 无敌 ${game.debugInvuln ? 'ON' : 'OFF'}`)
+    UI.toast(
+      window.EchoLang.isEN()
+        ? `[DEBUG] Invuln ${game.debugInvuln ? 'ON' : 'OFF'}`
+        : `[DEBUG] 无敌 ${game.debugInvuln ? 'ON' : 'OFF'}`,
+    )
     return game.debugInvuln
   }
   function onDebugKey(e) {
@@ -217,29 +221,106 @@
   }
 
   /* ---------------- 护符（元进度） ---------------- */
-  /* ---------------- 存档导入/导出（Base64 编码的 JSON） ---------------- */
+  /* ---------------- 存档导入/导出（Base64 JSON + 完整性校验） ----------------
+   * 存档码是外部输入：旧版只检查 v===1 与 typeof run === 'object'，实测
+   * {} / {floor:999,hp:-5} 都会被接受并写进 localStorage。现在导入前统一
+   * 走字段白名单 + 范围校验；导出附带可选 sum（FNV-1a 32 位，防粘贴截断/位翻转）。
+   * v 仍为 1：旧码没有 sum，导入时跳过校验和但同样走白名单，保持向后兼容。
+   */
+  function saveChecksum(v, meta, run) {
+    const body = JSON.stringify({ v, meta, run })
+    let h = 2166136261
+    for (let i = 0; i < body.length; i++) {
+      h ^= body.charCodeAt(i)
+      h = Math.imul(h, 16777619)
+    }
+    return (h >>> 0).toString(36)
+  }
+  const finite = (v) => typeof v === 'number' && Number.isFinite(v)
+  const strList = (v, max) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, max) : [])
+
+  function sanitizeMeta(m) {
+    const out = defaultMeta()
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return out
+    const nat = (k) => (finite(m[k]) && m[k] >= 0 ? Math.floor(m[k]) : out[k])
+    out.best = nat('best')
+    out.dust = nat('dust')
+    out.runs = nat('runs')
+    out.wins = nat('wins')
+    out.charmsOwned = strList(m.charmsOwned, 64)
+    out.endlessUnlocked = !!m.endlessUnlocked
+    out.muted = !!m.muted
+    return out
+  }
+
+  /* 只保留 restoreFrom 认识的字段，杜绝任意状态注入 / 原型污染。
+   * floor 允许 >100（无尽模式合法，data.js 的 endlessMul 即按 f-100 成长），
+   * 只挡荒谬值；lastRecording 限长，避免超大存档码。 */
+  function sanitizeRun(r) {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) throw new Error('run')
+    if (!finite(r.seed)) throw new Error('seed')
+    if (!finite(r.floor) || r.floor < 1 || r.floor > 100000) throw new Error('floor')
+    if (typeof r.classId !== 'string' || !r.classId) throw new Error('classId')
+    if (!finite(r.hp) || r.hp < 0 || r.hp > 10000) throw new Error('hp')
+    const out = {
+      v: 1,
+      seed: Math.floor(r.seed),
+      floor: Math.floor(r.floor),
+      classId: r.classId,
+      hp: r.hp,
+      endless: !!r.endless,
+      charms: strList(r.charms, 64),
+      relicIds: strList(r.relicIds, 64),
+      bonus: {
+        maxHp: finite(r.bonus && r.bonus.maxHp) ? r.bonus.maxHp : 0,
+        atk: finite(r.bonus && r.bonus.atk) ? r.bonus.atk : 0,
+      },
+    }
+    for (const k of ['gold', 'dust', 'bombs', 'keys', 'xp']) out[k] = finite(r[k]) && r[k] >= 0 ? Math.floor(r[k]) : 0
+    out.lv = finite(r.lv) && r.lv >= 1 ? Math.floor(r.lv) : 1
+    out.runStats = {}
+    for (const k of ['kills', 'goldEarned', 'dustEarned', 'stepsTotal', 'shardsTotal', 'startTime'])
+      out.runStats[k] = finite(r.runStats && r.runStats[k]) ? r.runStats[k] : 0
+    out.reviveUsed = {
+      phoenix: !!(r.reviveUsed && r.reviveUsed.phoenix),
+      charm: !!(r.reviveUsed && r.reviveUsed.charm),
+    }
+    out.lastRecording = Array.isArray(r.lastRecording)
+      ? r.lastRecording
+          .slice(0, 20000)
+          .filter((c) => c && (c.t === 'w' || (c.t === 'm' && finite(c.dx) && finite(c.dy))))
+      : []
+    if (finite(r.rng)) out.rng = Math.floor(r.rng)
+    return out
+  }
+
   function exportSaveCode() {
-    const m = loadMeta()
+    const m = sanitizeMeta(loadMeta())
     let run = null
     try {
-      run = JSON.parse(store.get('echoTower.run'))
+      const raw = JSON.parse(store.get('echoTower.run'))
+      if (raw) run = sanitizeRun(raw)
     } catch (e) {
       run = null
     }
-    return btoa(unescape(encodeURIComponent(JSON.stringify({ v: 1, meta: m, run })))) // UTF-8 安全
+    const payload = { v: 1, meta: m, run, sum: saveChecksum(1, m, run) }
+    return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))) // UTF-8 安全
   }
   function importSaveCode(code) {
     const en = window.EchoLang.isEN()
     try {
       const payload = JSON.parse(decodeURIComponent(escape(atob(code))))
       if (!payload || payload.v !== 1) throw new Error('version')
+      // 旧 v1 码无 sum：跳过校验和，但字段白名单照常执行
+      if (typeof payload.sum === 'string' && payload.sum !== saveChecksum(1, payload.meta, payload.run))
+        throw new Error('checksum')
+      // 只在码里确实带 meta 时覆盖；缺 meta 的码不应抹掉本机已有的元进度
       if (payload.meta && typeof payload.meta === 'object') {
-        meta = Object.assign(defaultMeta(), payload.meta)
-        meta.v = 1
+        meta = sanitizeMeta(payload.meta)
         saveMeta(meta)
       }
       if (payload.run && typeof payload.run === 'object') {
-        store.set('echoTower.run', JSON.stringify(payload.run))
+        store.set('echoTower.run', JSON.stringify(sanitizeRun(payload.run)))
       }
       UI.toast(en ? '✓ Save restored' : '✓ 存档已恢复')
       return true
@@ -388,7 +469,7 @@
       enterPlay()
     } catch (e) {
       console.error(e)
-      UI.toast('存档损坏，开始新的一局')
+      UI.toast(window.EchoLang.isEN() ? 'Corrupt save — starting a new run' : '存档损坏，开始新的一局')
       classSelect()
     }
   }
@@ -496,7 +577,12 @@
         if (game.classId === 'ranger' && (!s.unlockSwap || !echoAlive)) game.useSkill('spark')
         else if (s.unlockSwap) game.useSkill('swap')
         else if (game.classId === 'ranger') game.useSkill('spark')
-        else UI.toast('尚未解锁【置换】（天赋池中获得）')
+        else
+          UI.toast(
+            window.EchoLang.isEN()
+              ? 'SWAP not unlocked yet (get it from the talent pool)'
+              : '尚未解锁【置换】（天赋池中获得）',
+          )
         continue
       }
       if (act.action === 'skill3') {

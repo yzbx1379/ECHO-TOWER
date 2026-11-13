@@ -8,7 +8,7 @@
   },
   "description": "回声之塔 ECHO TOWER —— 100层回声重演爬塔Roguelite（纯HTML5 Canvas，零依赖）",
   "scripts": {
-    "test": "node test/gen.test.cjs && node test/sim.test.cjs && node test/combat.test.cjs && node test/echo.test.cjs && node test/dom-stub.cjs && node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug && node test/static.test.cjs && node test/docs.test.cjs",
+    "test": "node test/gen.test.cjs && node test/sim.test.cjs && node test/combat.test.cjs && node test/echo.test.cjs && node test/dom-stub.cjs && node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug && node test/static.test.cjs && node test/i18n.test.cjs && node test/docs.test.cjs",
     "test:gen": "node test/gen.test.cjs",
     "test:sim": "node test/sim.test.cjs",
     "test:survival": "node test/sim.test.cjs --real-hp",
@@ -17,6 +17,7 @@
     "test:ui": "node test/dom-stub.cjs",
     "test:debug": "node test/dom-stub.cjs --debug && node test/dom-stub.cjs --url-debug",
     "test:static": "node test/static.test.cjs",
+    "test:i18n": "node test/i18n.test.cjs",
     "test:docs": "node test/docs.test.cjs",
     "test:sw": "node test/sw-stale.cjs",
     "test:perf": "node test/perf.cjs",
